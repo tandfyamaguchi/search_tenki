@@ -1,0 +1,10 @@
+{% extends "search/base.html" %}
+{% block content %}
+
+<ul>
+    {% for y in list %}
+        <li><a type=button href="{% url 'search:SelectNo' id=y.id %}">{{ y.year }}年(Vol. {{y.volume}})</a></li>
+    {% endfor %}
+</ul>
+
+{% endblock %}

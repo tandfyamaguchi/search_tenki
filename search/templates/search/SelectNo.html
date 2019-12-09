@@ -1,0 +1,13 @@
+{% extends "search/base.html" %}
+{% block content %}
+<ul>
+    {{vol}}
+    {% for m in list %}
+        <li>
+            <a type=button href="{% url 'list:ShowList1' id=m.id %}">No.{{m.no}}</a>
+            page:{{m.start_page}} -
+        </li>
+    {% endfor %}
+</ul>
+
+{% endblock %}

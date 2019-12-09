@@ -1,0 +1,59 @@
+{% extends "search/base.html" %}
+{% block content %}
+
+<form method="post" action="">
+    <table border="1">
+        <thead>
+          <tr>
+            <th>内容分類</th>
+            <th>カテゴリー</th>
+            <th>タイトル</th>
+            <th>著者</th>
+            <th>巻</th>
+            <th>開始頁</th>
+            <th>号</th>
+            <th>キーワード</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for kiji in kiji_list %}
+            <tr>
+              <td>
+                {% for bunrui in kiji.bunrui.all %}
+                <a href="{% url 'list:ShowList3' id=bunrui.id shurui=0 %}">{{ bunrui.name }}</a> 
+                {% endfor%}
+              </td>
+              <td>{{ kiji.category }}</td>
+              <td>{{ kiji.title }}</td>
+              <td>
+                {% for author in kiji.author.all %}
+                <a href="{% url 'list:ShowList3' id=author.id shurui=1 %}">{{ author.name }}</a> 
+                {% endfor%}
+              </td>
+              <td>{{ kiji.volume }}</td>
+              <td>{{ kiji.startpage }}</td>
+              <td>{{ kiji.no }}</td>
+              <td>
+                {% for keyword in kiji.keyword.all %}
+                <a href="{% url 'list:ShowList3' id=keyword.id shurui=2 %}">{{ keyword.name }}</a> 
+                {% endfor%}
+              </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <footer>
+          <tr>
+            <th>内容分類</th>
+            <th>カテゴリー</th>
+            <th>タイトル</th>
+            <th>著者</th>
+            <th>巻</th>
+            <th>開始頁</th>
+            <th>号</th>
+            <th>キーワード</th>
+          </tr>
+        </footer>>
+    </table>
+</form>
+
+{% endblock %}
