@@ -19,6 +19,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-import pymysql #pymysqlのインポート
-pymysql.install_as_MySQLdb() #MySQLの指定
