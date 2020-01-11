@@ -7,6 +7,7 @@ __pycache__
 myvenv
 #db.sqlite3
 #etenki.db
-/static
+#/static
 .DS_Store
 requirements.txt
+bootstrap-4.4.1-dist

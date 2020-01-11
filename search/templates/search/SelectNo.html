@@ -1,13 +1,15 @@
 {% extends "search/base.html" %}
 {% block content %}
-<ul>
-    {{vol}}
-    {% for m in list %}
-        <li>
-            <a type=button href="{% url 'list:ShowList1' id=m.id %}">No.{{m.no}}</a>
-            page:{{m.start_page}} -
-        </li>
-    {% endfor %}
-</ul>
-
-{% endblock %}
+    検索条件:「{{vol}}」
+    <div class="d-flex flex-row flex-wrap">
+            {% for m in list %}
+                {% if m.no == 13 %}
+                    <a type="button" class="btn btn-light" style="width: 150px;" href="{% url 'list:ShowList1' id=m.id %}">特別号</a>
+                {% else %}
+                    <a type="button" class="btn btn-light" style="width: 150px;" href="{% url 'list:ShowList1' id=m.id %}">No.{{m.no}} page:{{m.start_page}} -
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>    
+{% endblock content %}

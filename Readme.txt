@@ -1,3 +1,12 @@
+20200111　改良(山口)
+	・レイアウトの変更
+	・pdf表示のリンクを貼る
+	・著者名に「他」が入っていると、リンクを貼らない
+	・「特別号」のリンクを貼る
+	・ヘッダーの画像の設置
+	・faviconの設定
+ーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーー
+
 htmlの構造
  base.html
  home/index.html 最初の画面
@@ -5,6 +14,10 @@ htmlの構造
  search/SelectNo.html 号を選ぶ
  search/SearchDetail.html 詳細検索の入力
  list/ShowList1.html 検索結果の表示
+ list/page.html ページネーションの設定
+
+templatetags
+	list/mypaginator.py urlのrequest.GETを引き継ぐ
 
 
 databaseの使い分け
@@ -56,6 +69,11 @@ modelの構造
  basemodel/Naiyou
 	title
 
+static
+	css 空(後から使うよう)
+	image
+		favicon.ico faviconの画像
+		tenki_top.jpg ヘッターの画像
 
 etenki.dbの改良
 Naiyouのcodeをidに変更(管理画面に表示するときにidがないとエラーが出るため)

@@ -66,6 +66,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'utility': 'list.templatetags.mypaginator' # urlのGETを引き継ぐ
+            }
         },
     },
 ]
@@ -128,3 +131,4 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+PDF_URL='https://www.metsoc.jp/tenki/pdf/'
