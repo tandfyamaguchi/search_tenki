@@ -1,6 +1,6 @@
 {% extends "search/base.html" %}
 {% block content %}
-  {{ kensu }}件 {{ page_obj.num_pages }}ページ中{{ page_obj.number }}ページ目、検索条件: {{ joken }}
+  {{ kensu }}件 {{ page_obj.paginator.num_pages }}ページ中{{ page_obj.number }}ページ目、検索条件: {{ joken }}
   <table border="1">
       <thead>
         <tr>
