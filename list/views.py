@@ -34,7 +34,7 @@ def ShowListView1(request,id):
     kiji_list=Kijis.objects.filter(volume=vol, no=n)
     page_obj = paginate_query(request, kiji_list)
     kensu = kiji_list.count()
-    joken = '「卷:'+str(vol)+'」「号:'+str(n)+'」'
+    joken = '「巻:'+str(vol)+'」「号:'+str(n)+'」'
 
     context={'page_obj':page_obj, 'kensu':kensu, 'joken':joken, 'PDF_URL':PDF_URL}
 
