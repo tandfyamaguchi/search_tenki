@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf8">
+    <title>{% block title %}機関誌{% endblock%}</title>
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+</head>
+
+<body>
+    <header>
+        <link rel="icon" href="{% static '/static/image/favicon.ico' %}">
+        <div class='header'>
+        {% block header %}
+            <img src="/static/image/tenki_top.jpg" style="max-height:500px"/>
+        {% endblock header %}
+        </div>
+    </header>
+    <p>
+    <div class="container">
+        <div class="content">
+            {% block content %}{% endblock content %}
+        </div>
+    </div>
+</body>
+
+</html>

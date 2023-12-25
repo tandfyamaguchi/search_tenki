@@ -1,0 +1,14 @@
+<!--年を選択-->
+{% extends "search/base.html" %}
+{% block content %}
+    <h2>発行年（巻）を選択してください。</h2>
+    <!--年を選択し、Noを選択する画面に移動する-->
+    <div class="d-flex flex-row flex-wrap">
+        {% for y in list %}
+            <a type="button" class="btn btn-outline-dark"  style="width: 170px;" href="{% url 'search:SelectNo' id=y.id %}">{{ y.year }}年(Vol. {{y.volume}})</a>
+        {% endfor %}
+    </div>
+    <p>
+    <!--特別号を選択した場合は検索結果を表示する-->
+    <a type="button" class="btn btn-outline-dark" style="width: 170px;" href="{% url 'list:ShowList1' id=45 %}">75周年特別号(1957年)</a>
+{% endblock content %}

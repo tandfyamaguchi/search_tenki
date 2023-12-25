@@ -1,0 +1,69 @@
+<!--検索結果を表示するhtml-->
+{% extends "search/base.html" %}
+
+{% block content %}
+  {{ kensu }}件 {{ page_obj.paginator.num_pages }}ページ中{{ page_obj.number }}ページ目、検索条件: {{ joken }}
+  <table border="1">
+      <thead>
+        <tr>
+          <th>内容分類</th>
+          <th>カテゴリー</th>
+          <th>タイトル</th>
+          <th>著者</th>
+          <th>巻</th>
+          <th>号</th>
+          <th>開始頁</th>            
+          <th>キーワード</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for kiji in page_obj %}
+          <tr>
+            <td>
+              {% for bunrui in kiji.bunrui.all %}
+              <a href="{% url 'list:ShowList3' id=bunrui.id shurui=0 %}">{{ bunrui.name }}</a> 
+              {% endfor%}
+            </td>
+            <td>{{ kiji.category }}</td>
+            <td>
+              <a type="button" class="btn btn-outline-danger  btn-sm" href='{{ PDF_URL }}{{  kiji.pdf }}'>PDF</a>
+              {{ kiji.title }}
+            </td>
+            <td>
+              {% for author in kiji.author.all %}
+                {% if '他' in author.name %}
+                  {{ author.name }} 
+                {% else %}
+                  <a href="{% url 'list:ShowList3' id=author.id shurui=1 %}">{{ author.name }}</a> 
+                {% endif %}
+              {% endfor%}
+            </td>
+            <td>{{ kiji.volume }}</td>
+            <td>{{ kiji.no }}</td>
+            <td>{{ kiji.startpage }}</td>
+            <td>
+              {% for keyword in kiji.keyword.all %}
+              <a href="{% url 'list:ShowList3' id=keyword.id shurui=2 %}">{{ keyword.name }}</a>
+              {% endfor%}
+            </td>
+          </tr>
+      {% endfor %}
+      </tbody>
+      <footer>
+        <tr>
+          <th>内容分類</th>
+          <th>カテゴリー</th>
+          <th>タイトル</th>
+          <th>著者</th>
+          <th>巻</th>
+          <th>号</th>
+          <th>開始頁</th>
+          <th>キーワード</th>
+        </tr>
+      </footer>
+  </table>
+
+  <!--ページネーションを追加-->
+    {% include "list/page.html" %}
+
+{% endblock content %}

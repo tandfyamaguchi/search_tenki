@@ -1,0 +1,17 @@
+<!--Noを選択すると、検索結果を表示する-->
+{% extends "search/base.html" %}
+{% block content %}
+    <h2>号を選択してください。</h2>
+    検索条件:「{{vol}}巻（{{year}}年）」
+    <div class="d-flex flex-row flex-wrap">
+            {% for m in list %}
+                {% if m.no == 13 %}
+                    <a type="button" class="btn btn-outline-dark" style="width: 150px;" href="{% url 'list:ShowList1' id=m.id %}">特別号</a>
+                {% else %}
+                    <a type="button" class="btn btn-outline-dark" style="width: 150px;" href="{% url 'list:ShowList1' id=m.id %}"><b>No.{{m.no}}</b><br>page:{{m.start_page}} -
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>    
+{% endblock content %}

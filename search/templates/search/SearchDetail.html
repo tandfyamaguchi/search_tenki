@@ -1,0 +1,51 @@
+<!--詳細検索入力画面-->
+{% extends "search/base.html" %}
+{% block content %}
+詳細検索（条件を入力して検索）
+<!--SearchDetailFormで作成した入力フォーム結果をShowList2に返す-->
+<form action="{% url 'list:ShowList2' %}" method="GET">
+    {% csrf_token %}
+    <table>
+        <tr>
+            <th>{{ form.bun.label }}：</th>
+            <td>{{ form.bun }}</td>
+        </tr>
+        <tr>
+            <th>{{ form.categ.label }}：</th>
+            <td>{{ form.categ }}</td>
+        </tr>
+        <tr>
+            <th>{{ form.title.label }}：</th>
+            <td>{{ form.title }}</td>
+        </tr>
+        <tr>
+            <th>{{ form.author.label }}：</th>
+            <td>{{ form.author }}</td>
+        </tr>
+        <tr>
+            <th>{{ form.vol.label }}：</th>
+            <td>{{ form.vol }}</td>
+        </tr>
+        <tr>
+            <th>{{ form.n.label }}：</th>
+            <td>{{ form.n }}</td>
+        </tr>
+        <tr>
+            <th>{{ form.word.label }}：</th>
+            <td>{{ form.word }}</td>
+        </tr>
+        <td></td><td class="text-secondary">（検索結果表示オプション）</td>
+        <tr class="text-secondary">
+            <th>{{ form.order.label }}：</th>
+            <td>{{ form.order }}</td>
+        </tr>
+        <tr class="text-secondary">
+            <th>{{ form.pages.label }}：</th>
+            <td>{{ form.pages }}</td>
+        </tr>
+    </table>
+    <input type="submit" class="btn btn-primary" value="検索">
+    <input type="reset" class="btn btn-secondary" value="リセット">
+</form>
+
+{% endblock content %}
