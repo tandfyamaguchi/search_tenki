@@ -11,7 +11,6 @@ def find_category_group_errors(database_categories):
         category.id: category.name for category in database_categories
     }
     database_ids = set(database_names)
-    comment_ids = set(comment_names)
     errors = []
 
     for category_id in sorted(database_ids - configured_ids):
