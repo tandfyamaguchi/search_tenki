@@ -1,0 +1,11 @@
+/* 検索画面共通のヘッダー画像を中央に配置し、高さを保つ。 */
+.search-header__image {
+    display: block;
+    max-height: 500px;
+    margin: 0 auto;
+}
+
+/* 検索画面共通のフッター背景を設定する。 */
+.search-footer__inner {
+    background-color: rgba(0, 0, 0, 0.05);
+}

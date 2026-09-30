@@ -1,0 +1,8 @@
+/* 年度・号の選択ボタンの表示幅を分ける。 */
+.browse-link--year {
+    width: 170px;
+}
+
+.browse-link--issue {
+    width: 150px;
+}

@@ -1,0 +1,164 @@
+<!--詳細検索入力画面-->
+{% extends "search/base.html" %}
+{% load static %}
+{% block extra_css %}
+    <!-- 詳細検索画面用のCSSを読み込む。 -->
+    <link rel="stylesheet" href="{% static 'search/css/search-detail.css' %}">
+{% endblock extra_css %}
+{% block content %}
+<section class="search-detail" aria-labelledby="search-detail-title">
+    <header class="search-detail__header">
+        <h2 id="search-detail-title" class="search-detail__title h3">詳細検索</h2>
+        <p class="search-detail__intro">条件を入力して検索してください。</p>
+    </header>
+
+    <!-- SearchDetailFormの入力内容を検索結果画面へ送る。 -->
+    <form class="search-detail__form" action="{% url 'list:ShowList2' %}" method="GET">
+        {{ form.non_field_errors }}
+
+        <!-- 検索条件と表示オプションを、色分けした1つの枠にまとめる。 -->
+        <div class="search-form-panel">
+            <section class="search-form-section search-form-section--conditions" aria-labelledby="search-conditions-title">
+                <h3 id="search-conditions-title" class="search-form-section__title">検索条件</h3>
+                <div class="search-form-section__body">
+                    <div class="search-field">
+                        <div class="search-field__label">{{ form.bun.label_tag }}</div>
+                        <div class="search-field__control">{{ form.bun }}{{ form.bun.errors }}</div>
+                    </div>
+
+                    <div class="search-field search-field--category">
+                        <div class="search-field__label">{{ form.categ.label }}</div>
+                        <div class="search-field__control">
+                            <!-- JavaScriptが無効でも、すべてのチェックボックスをそのまま操作できる。 -->
+                            <section class="category-picker" data-category-picker aria-labelledby="category-picker-heading">
+                                <h3 id="category-picker-heading" class="category-picker__visually-hidden">カテゴリ</h3>
+                                <input id="category-filter" class="form-control category-picker__filter" type="search" placeholder="カテゴリ名で絞り込む" autocomplete="off" aria-controls="category-options" aria-describedby="category-match-status">
+                                <div class="category-picker__controls">
+                                    <button id="category-select-all" class="btn btn-outline-secondary btn-sm" type="button" aria-controls="category-options" aria-label="すべてのカテゴリを選択" disabled>全て選択（全カテゴリ）</button>
+                                    <button id="category-clear" class="btn btn-outline-secondary btn-sm" type="button" aria-controls="category-options" disabled>全解除</button>
+                                </div>
+                                <p id="category-match-status" class="category-picker__status" role="status" aria-live="polite"></p>
+                                <ul id="category-options" class="category-picker__options" aria-label="投稿案内の原稿種別">
+                                    {% for group in form.category_groups %}
+                                        <li class="category-picker__group" data-category-group>
+                                            <div class="category-picker__group-toggle">
+                                                <input id="{{ group.input_id }}" type="checkbox" data-category-group-toggle aria-controls="{{ group.child_list_id }}"{% if not group.categories %} disabled{% endif %}>
+                                                <label for="{{ group.input_id }}" class="category-picker__group-label">{{ group.name }}</label>
+                                                <span class="category-picker__group-count">（{{ group.categories|length }}）</span>
+                                            </div>
+                                            <!-- JavaScriptが無効な場合も、実カテゴリを個別に選択できる。 -->
+                                            <ul id="{{ group.child_list_id }}" class="category-picker__group-children" data-category-group-children>
+                                                {% for category in group.categories %}
+                                                    <li class="category-picker__option" data-category-option>
+                                                        <div class="category-picker__checkbox">
+                                                            <input id="{{ category.input_id }}" name="categ" type="checkbox" value="{{ category.id }}" data-category-input{% if category.selected %} checked{% endif %}>
+                                                            <label for="{{ category.input_id }}">{{ category.name }}</label>
+                                                        </div>
+                                                    </li>
+                                                {% empty %}
+                                                    <li class="category-picker__option">登録カテゴリはありません。</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                <p id="category-no-results" class="category-picker__no-results" role="status" aria-live="polite" hidden>一致するカテゴリがありません。</p>
+                            </section>
+                            {{ form.categ.errors }}
+                        </div>
+                    </div>
+
+                    <div class="search-field">
+                        <div class="search-field__label">{{ form.title.label_tag }}</div>
+                        <div class="search-field__control">{{ form.title }}{{ form.title.errors }}</div>
+                    </div>
+                    <div class="search-field">
+                        <div class="search-field__label">{{ form.author.label_tag }}</div>
+                        <div class="search-field__control">{{ form.author }}{{ form.author.errors }}</div>
+                    </div>
+                    <div class="search-field search-field--checkbox-picker">
+                        <div class="search-field__label">{{ form.vol.label_tag }}</div>
+                        <div class="search-field__control">
+                            <!-- JavaScriptが無効でも、巻を個別のチェックボックスで選択できる。 -->
+                            <section id="volume-picker" class="multi-checkbox-picker" data-checkbox-picker aria-labelledby="volume-picker-heading">
+                                <h3 id="volume-picker-heading" class="multi-checkbox-picker__visually-hidden">巻</h3>
+                                <div class="multi-checkbox-picker__controls">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-checkbox-picker-select-all aria-controls="volume-options volume-selection-status" aria-label="すべての巻を選択" disabled>全て選択（全巻）</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-checkbox-picker-clear aria-controls="volume-options volume-selection-status" disabled>全解除</button>
+                                </div>
+                                <p id="volume-selection-status" class="multi-checkbox-picker__status" data-checkbox-picker-status role="status" aria-live="polite"></p>
+                                <div id="volume-options" class="multi-checkbox-picker__options" aria-describedby="volume-selection-note volume-selection-status">
+                                    {% for volume_choice in form.vol %}
+                                        <div class="multi-checkbox-picker__option">{{ volume_choice }}</div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+                            {{ form.vol.errors }}
+                        </div>
+                    </div>
+                    <div class="search-field search-field--checkbox-picker">
+                        <div class="search-field__label">{{ form.n.label_tag }}</div>
+                        <div class="search-field__control">
+                            <!-- JavaScriptが無効でも、号を個別のチェックボックスで選択できる。 -->
+                            <section id="issue-picker" class="multi-checkbox-picker" data-checkbox-picker aria-labelledby="issue-picker-heading">
+                                <h3 id="issue-picker-heading" class="multi-checkbox-picker__visually-hidden">号</h3>
+                                <div class="multi-checkbox-picker__controls">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-checkbox-picker-select-all aria-controls="issue-options issue-selection-status" aria-label="すべての号を選択" disabled>全て選択（全号）</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-checkbox-picker-clear aria-controls="issue-options issue-selection-status" disabled>全解除</button>
+                                </div>
+                                <p id="issue-selection-status" class="multi-checkbox-picker__status" data-checkbox-picker-status role="status" aria-live="polite"></p>
+                                <div id="issue-options" class="multi-checkbox-picker__options multi-checkbox-picker__options--issue" aria-describedby="issue-selection-note issue-selection-status">
+                                    {% for issue_choice in form.n %}
+                                        <div class="multi-checkbox-picker__option">{{ issue_choice }}</div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+                            {{ form.n.errors }}
+                        </div>
+                    </div>
+                    <div class="search-field">
+                        <div class="search-field__label">{{ form.word.label_tag }}</div>
+                        <div class="search-field__control">{{ form.word }}{{ form.word.errors }}</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="search-form-section search-form-section--options" aria-labelledby="search-options-title">
+                <h3 id="search-options-title" class="search-form-section__title">検索結果表示オプション</h3>
+                <div class="search-form-section__body search-options">
+                    <div class="search-option">
+                        {{ form.order.label_tag }}
+                        {{ form.order }}
+                        {{ form.order.errors }}
+                    </div>
+                    <div class="search-option">
+                        {{ form.pages.label_tag }}
+                        {{ form.pages }}
+                        {{ form.pages.errors }}
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="search-detail__actions">
+            <input type="submit" class="btn btn-primary" value="検索">
+            <input type="reset" class="btn btn-secondary" value="リセット">
+        </div>
+    </form>
+
+<!--タイトル・著者・キーワード欄の検索ルール-->
+    <section class="search-rules" aria-labelledby="search-rules-title">
+        <h2 id="search-rules-title" class="search-rules__title">検索ルール</h2>
+        <div class="search-rules__body">
+            <p>タイトル・著者・キーワードの各欄では、次のルールで検索します。</p>
+            <ul>
+                <li>AND検索：単語の間に空白を入れる。例：<code>台風 豪雨</code></li>
+                <li>OR検索：単語と単語の間に独立した大文字の <code>OR</code> を入れる。例：<code>台風 OR 豪雨</code></li>
+                <li>NOT検索：除外したい単語の前に半角ハイフン <code>-</code> を付ける。例：<code>台風 -速報</code></li>
+            </ul>
+            <p>タイトル・著者・キーワードの各欄において、AND検索します。<br>
+                例：　著者名を「田中」、巻を「12」として検索を開始　→　「著者名が田中を含み、かつ、12巻」　の記事を検索します。</p>
+        </div>
+    </section>
+
+{% endblock content %}

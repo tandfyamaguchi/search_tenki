@@ -1,0 +1,79 @@
+{% load mypaginator %}
+<!-- 上下で同じ並び替え見出しを表示する。 -->
+<tr>
+  <th scope="col">内容分類</th>
+  <th scope="col"{% if primary_header and sort_field == 'category' %} aria-sort="{% if sort_direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+    <a class="sort-link" href="?{% sort_url request 'category' sort_field sort_direction %}">
+      カテゴリー
+      {% if sort_field == 'category' %}
+        <span aria-hidden="true">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+        <span class="sr-only">現在{% if sort_direction == 'asc' %}昇順。降順{% else %}降順。昇順{% endif %}に並べ替え</span>
+      {% else %}
+        <span aria-hidden="true">▼▲</span>
+        <span class="sr-only">昇順に並べ替え</span>
+      {% endif %}
+    </a>
+  </th>
+  <th scope="col"{% if primary_header and sort_field == 'title' %} aria-sort="{% if sort_direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+    <a class="sort-link" href="?{% sort_url request 'title' sort_field sort_direction %}">
+      タイトル
+      {% if sort_field == 'title' %}
+        <span aria-hidden="true">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+        <span class="sr-only">現在{% if sort_direction == 'asc' %}昇順。降順{% else %}降順。昇順{% endif %}に並べ替え</span>
+      {% else %}
+        <span aria-hidden="true">▼▲</span>
+        <span class="sr-only">昇順に並べ替え</span>
+      {% endif %}
+    </a>
+  </th>
+  <th scope="col"{% if primary_header and sort_field == 'author' %} aria-sort="{% if sort_direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+    <a class="sort-link" href="?{% sort_url request 'author' sort_field sort_direction %}">
+      著者
+      {% if sort_field == 'author' %}
+        <span aria-hidden="true">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+        <span class="sr-only">現在{% if sort_direction == 'asc' %}昇順。降順{% else %}降順。昇順{% endif %}に並べ替え</span>
+      {% else %}
+        <span aria-hidden="true">▼▲</span>
+        <span class="sr-only">昇順に並べ替え</span>
+      {% endif %}
+    </a>
+  </th>
+  <!-- 数値3列は、巻、号、開始頁を一組にした刊行順で切り替える。 -->
+  <th scope="col"{% if primary_header and sort_field == 'publication' %} aria-sort="{% if sort_direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+    <a class="sort-link" href="?{% sort_url request 'publication' sort_field sort_direction %}">
+      巻
+      {% if sort_field == 'publication' %}
+        <span aria-hidden="true">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+        <span class="sr-only">現在、巻・号・開始頁の{% if sort_direction == 'asc' %}昇順。降順{% else %}降順。昇順{% endif %}に並べ替え</span>
+      {% else %}
+        <span aria-hidden="true">▼▲</span>
+        <span class="sr-only">巻・号・開始頁を昇順に並べ替え</span>
+      {% endif %}
+    </a>
+  </th>
+  <th scope="col">
+    <a class="sort-link" href="?{% sort_url request 'publication' sort_field sort_direction %}">
+      号
+      {% if sort_field == 'publication' %}
+        <span aria-hidden="true">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+        <span class="sr-only">現在、巻・号・開始頁の{% if sort_direction == 'asc' %}昇順。降順{% else %}降順。昇順{% endif %}に並べ替え</span>
+      {% else %}
+        <span aria-hidden="true">▼▲</span>
+        <span class="sr-only">巻・号・開始頁を昇順に並べ替え</span>
+      {% endif %}
+    </a>
+  </th>
+  <th scope="col">
+    <a class="sort-link" href="?{% sort_url request 'publication' sort_field sort_direction %}">
+      開始頁
+      {% if sort_field == 'publication' %}
+        <span aria-hidden="true">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+        <span class="sr-only">現在、巻・号・開始頁の{% if sort_direction == 'asc' %}昇順。降順{% else %}降順。昇順{% endif %}に並べ替え</span>
+      {% else %}
+        <span aria-hidden="true">▼▲</span>
+        <span class="sr-only">巻・号・開始頁を昇順に並べ替え</span>
+      {% endif %}
+    </a>
+  </th>
+  <th scope="col">キーワード</th>
+</tr>

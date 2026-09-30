@@ -1,0 +1,396 @@
+/* カテゴリ選択欄を、長い候補一覧でも見やすく整える。 */
+.category-picker {
+    width: 100%;
+    max-width: 48rem;
+    margin: 0;
+    padding: 1rem;
+    box-sizing: border-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    background-color: #fff;
+}
+
+.category-picker__visually-hidden,
+.multi-checkbox-picker__visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.category-picker__help,
+.category-picker__status {
+    margin-bottom: 0.5rem;
+}
+
+.category-picker__filter-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.category-picker__filter {
+    width: 100%;
+    max-width: 28rem;
+}
+
+.category-picker__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.category-picker__options {
+    max-height: 28rem;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    border-top: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.category-picker__group {
+    padding: 0.5rem 0.25rem;
+    list-style: none;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+.category-picker__group:last-child {
+    border-bottom: 0;
+}
+
+.category-picker__group-toggle {
+    display: flex;
+    align-items: flex-start;
+}
+
+.category-picker__group-toggle input {
+    flex: 0 0 auto;
+    margin-top: 0.3rem;
+}
+
+.category-picker__group-label {
+    margin: 0 0 0 0.45rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.category-picker__group-count {
+    margin-left: 0.35rem;
+    color: #6c757d;
+}
+
+.category-picker__group-children {
+    padding: 0;
+    margin: 0.5rem 0 0 1.5rem;
+    border-top: 1px solid #f1f3f5;
+}
+
+.category-picker__option {
+    padding: 0.5rem 0.25rem;
+    list-style: none;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+.category-picker__option:last-child {
+    border-bottom: 0;
+}
+
+.category-picker__checkbox {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+}
+
+.category-picker__checkbox input {
+    flex: 0 0 auto;
+    margin-top: 0.3rem;
+}
+
+.category-picker__checkbox label {
+    margin: 0 0 0 0.45rem;
+    cursor: pointer;
+}
+
+.category-picker button:focus,
+.category-picker input:focus,
+.category-picker label:focus-within {
+    outline: 2px solid #0056b3;
+    outline-offset: 2px;
+}
+
+.category-picker__group[hidden],
+.category-picker__group-children[hidden],
+.category-picker__option[hidden],
+.category-picker__no-results[hidden] {
+    display: none !important;
+}
+
+/* 巻・号の候補を、絞り込みなしのチェックボックス一覧として表示する。 */
+.multi-checkbox-picker {
+    width: 100%;
+    max-width: 48rem;
+    margin: 0;
+    padding: 1rem;
+    box-sizing: border-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    background-color: #fff;
+}
+
+.multi-checkbox-picker__help,
+.multi-checkbox-picker__status {
+    margin-bottom: 0.5rem;
+}
+
+.multi-checkbox-picker__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.multi-checkbox-picker__options {
+    max-height: 18rem;
+    padding: 0.5rem;
+    overflow-y: auto;
+    border-top: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr));
+    gap: 0.35rem 0.6rem;
+}
+
+.multi-checkbox-picker__options--issue {
+    max-height: none;
+}
+
+.multi-checkbox-picker__option {
+    min-width: 0;
+}
+
+.multi-checkbox-picker__option label {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    cursor: pointer;
+}
+
+.multi-checkbox-picker__option input {
+    flex: 0 0 auto;
+    margin-top: 0.3rem;
+    margin-right: 0.45rem;
+}
+
+.multi-checkbox-picker button:focus,
+.multi-checkbox-picker input:focus,
+.multi-checkbox-picker label:focus-within {
+    outline: 2px solid #0056b3;
+    outline-offset: 2px;
+}
+
+/* 詳細検索画面全体を、右側の本文領域内で中央に配置する。 */
+.search-detail {
+    width: 100%;
+    max-width: 64rem;
+    margin: 0 auto;
+    color: #212529;
+}
+
+.search-detail__header {
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+
+.search-detail__title {
+    margin-bottom: 0.35rem;
+}
+
+.search-detail__intro {
+    margin-bottom: 0;
+    color: #495057;
+}
+
+/* 検索条件と表示オプションを、1つの外枠にまとめる。 */
+.search-form-panel {
+    margin: 0 0 1.25rem;
+    overflow: hidden;
+    border: 1px solid #ced4da;
+    border-radius: 0.4rem;
+    background-color: #fff;
+}
+
+/* 通常の見出しを使い、タイトルと外枠の位置を正確にそろえる。 */
+.search-form-section__title {
+    margin: 0;
+    padding: 0.75rem 1rem 0.75rem 0.7rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.search-form-section__body {
+    padding: 1rem 1.25rem;
+}
+
+/* 2区分の間を1本の境界線で区切る。 */
+.search-form-section + .search-form-section {
+    border-top: 1px solid #ced4da;
+}
+
+/* 検索条件は青系の見出し色で示す。 */
+.search-form-section--conditions .search-form-section__title {
+    border-left: 0.35rem solid #4f81a8;
+    background-color: #eaf4fb;
+}
+
+/* 検索結果表示オプションはグレー系の色で区別する。 */
+.search-form-section--options {
+    background-color: #fafafa;
+}
+
+.search-form-section--options .search-form-section__title {
+    border-left: 0.35rem solid #6c757d;
+    background-color: #f0f0f0;
+}
+
+/* 通常の検索項目は、ラベル列と入力列をそろえて表示する。 */
+.search-field {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0.55rem 0;
+}
+
+.search-field + .search-field {
+    border-top: 1px solid #edf0f2;
+}
+
+.search-field__label {
+    padding-top: 0.35rem;
+    font-weight: 600;
+    text-align: right;
+}
+
+.search-field__label label {
+    margin: 0;
+}
+
+.search-field__control {
+    min-width: 0;
+}
+
+.search-field__control > input[type="text"],
+.search-field__control > select {
+    display: block;
+    width: 100%;
+    max-width: 28rem;
+    padding: 0.375rem 0.75rem;
+    color: #495057;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+
+.search-field__control > select[multiple] {
+    min-height: 8rem;
+    padding: 0.25rem;
+}
+
+.search-field__control .errorlist,
+.search-option .errorlist {
+    margin: 0.4rem 0 0;
+    padding-left: 1.25rem;
+    color: #b21f2d;
+}
+
+/* 表示オプションは、大きな画面では2列に並べる。 */
+.search-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 1.5rem;
+}
+
+.search-option label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+}
+
+.search-option select {
+    width: 100%;
+    max-width: 20rem;
+    padding: 0.375rem 0.75rem;
+    color: #495057;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+
+.search-detail__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 1.25rem 0 1.5rem;
+}
+
+/* 検索ルールを、入力パネルと区別できる案内枠にする。 */
+.search-rules {
+    overflow: hidden;
+    border: 1px solid #cfdda2;
+    border-radius: 0.4rem;
+    background-color: #fff;
+}
+
+.search-rules__title {
+    margin: 0;
+    padding: 0.75rem 1rem 0.75rem 0.7rem;
+    border-left: 0.35rem solid #82964a;
+    background-color: #f3f8df;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.search-rules__body {
+    padding: 1rem 1.25rem;
+}
+
+.search-rules__body > :last-child {
+    margin-bottom: 0;
+}
+
+.search-rules code {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px) {
+    .search-field {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.25rem;
+    }
+
+    .search-field__label {
+        padding-top: 0;
+        text-align: left;
+    }
+
+    .search-options {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .category-picker {
+        padding: 0.75rem;
+    }
+
+    .multi-checkbox-picker {
+        padding: 0.75rem;
+    }
+}

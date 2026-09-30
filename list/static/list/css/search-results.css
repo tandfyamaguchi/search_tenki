@@ -1,0 +1,22 @@
+/* 検索結果表の上下の見出しセルを薄い黄緑色にする。 */
+.search-results-table thead th,
+.search-results-table tfoot th {
+  background-color: #edf7d0;
+}
+
+/* 検索結果の行へ交互にグレーの背景色を付ける。 */
+.search-results-table tbody tr:nth-child(odd) {
+  background-color: #f0f0f0;
+}
+
+.search-results-table tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* 並び替えリンクを見出しと同じ文字色で表示する。 */
+.search-results-table .sort-link,
+.search-results-table .sort-link:hover,
+.search-results-table .sort-link:focus {
+  color: inherit;
+  white-space: nowrap;
+}

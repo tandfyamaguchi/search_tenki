@@ -1,0 +1,57 @@
+<!--検索結果を表示するhtml-->
+{% extends "search/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+  <!-- 検索結果一覧の専用スタイルを読み込む。 -->
+  <link rel="stylesheet" href="{% static 'list/css/search-results.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+  {{ kensu }}件 {{ page_obj.paginator.num_pages }}ページ中{{ page_obj.number }}ページ目、検索条件: {{ joken }}
+  <table border="1" class="search-results-table">
+      <thead>
+        {% include "list/_result_header.html" with primary_header=True %}
+      </thead>
+      <tbody>
+      {% for kiji in page_obj %}
+          <tr>
+            <td>
+              {% for bunrui in kiji.bunrui.all %}
+              <a href="{% url 'list:ShowList3' id=bunrui.id shurui=0 %}">{{ bunrui.name }}</a> 
+              {% endfor%}
+            </td>
+            <td>{{ kiji.category }}</td>
+            <td>
+              <a type="button" class="btn btn-outline-danger  btn-sm" href='{{ PDF_URL }}{{  kiji.pdf }}'>PDF</a>
+              {{ kiji.title }}
+            </td>
+            <td>
+              {% for author in kiji.ordered_authors %}
+                {% if '他' in author.name %}
+                  {{ author.name }} 
+                {% else %}
+                  <a href="{% url 'list:ShowList3' id=author.id shurui=1 %}">{{ author.name }}</a> 
+                {% endif %}
+              {% endfor%}
+            </td>
+            <td>{{ kiji.volume }}</td>
+            <td>{{ kiji.no }}</td>
+            <td>{{ kiji.startpage }}</td>
+            <td>
+              {% for keyword in kiji.keyword.all %}
+              <a href="{% url 'list:ShowList3' id=keyword.id shurui=2 %}">{{ keyword.name }}</a>
+              {% endfor%}
+            </td>
+          </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        {% include "list/_result_header.html" with primary_header=False %}
+      </tfoot>
+  </table>
+
+  <!--ページネーションを追加-->
+    {% include "list/page.html" %}
+
+{% endblock content %}

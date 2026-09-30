@@ -1,0 +1,61 @@
+/* 画面全体を縦方向に並べ、短いページでもフッターを下端へ置く。 */
+html,
+body {
+    min-height: 100%;
+}
+
+body.site-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ヘッダー画像は実寸の750pxを保ち、表示領域の中央へ置く。 */
+.site-header__image-scroll {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.site-header__image-frame {
+    width: 750px;
+    margin: 0 auto;
+}
+
+.site-header__image {
+    display: block;
+    width: 750px;
+    min-width: 750px;
+    max-width: none;
+    height: 115px;
+}
+
+.site-header__title {
+    margin: 0.5rem 0 0;
+    text-align: center;
+}
+
+/* 左サイドナビを維持しながら、本文部分を可変高さにする。 */
+.site-main {
+    flex: 1 0 auto;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.site-sidebar {
+    align-self: flex-start;
+}
+
+.site-content {
+    min-width: 0;
+}
+
+/* フッターは固定表示にせず、短いページでは画面下端へ送る。 */
+.site-footer {
+    flex: 0 0 auto;
+    width: 100%;
+    margin-top: auto;
+}
+
+.site-footer__inner {
+    background-color: rgba(0, 0, 0, 0.05);
+}
