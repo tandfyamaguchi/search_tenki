@@ -59,10 +59,10 @@ class Command(BaseCommand):
         # 初期投入と同期を一つのトランザクションとして扱う。
         with transaction.atomic(using=TARGET_DATABASE):
             self._validate_migrations()
-            category_groups_by_key = self._validate_category_groups(
+            self._validate_target_is_empty()
+            category_groups_by_key = self._create_category_groups(
                 initial_data['category_group_definitions'],
             )
-            self._validate_target_is_empty()
             seed_counts = self._seed_target_data(
                 initial_data,
                 source_data,
@@ -381,44 +381,34 @@ class Command(BaseCommand):
                 f'{format_limited_values(pending_migrations)}'
             )
 
-    # migrationで作成される原稿種別が、初期データと一致するか確認する。
-    def _validate_category_groups(self, definitions):
-        try:
-            groups_by_name = {
-                group.name: group
-                for group in CategoryGroup.objects.using(TARGET_DATABASE).iterator()
-            }
-        except OperationalError as error:
-            raise CommandError(
-                '初期投入の前に、defaultへmigrationを最後まで適用してください。'
-            ) from error
+    # CSVに定義された原稿種別を作成し、カテゴリ投入用のキー対応を返す。
+    def _create_category_groups(self, definitions):
+        CategoryGroup.objects.using(TARGET_DATABASE).bulk_create(
+            [
+                CategoryGroup(name=group_name, display_order=display_order)
+                for _group_key, group_name, display_order in definitions
+            ],
+            batch_size=BATCH_SIZE,
+        )
 
-        expected_group_names = {
-            group_name for _group_key, group_name, _display_order in definitions
-        }
-        actual_group_names = set(groups_by_name)
-        if actual_group_names != expected_group_names:
-            missing_names = sorted(expected_group_names - actual_group_names)
-            unexpected_names = sorted(actual_group_names - expected_group_names)
-            raise CommandError(
-                '原稿種別の初期状態が一致しません。'
-                f'不足: {format_limited_values(missing_names)}; '
-                f'想定外: {format_limited_values(unexpected_names)}'
+        groups_by_name = {
+            group.name: group
+            for group in CategoryGroup.objects.using(TARGET_DATABASE).filter(
+                name__in=[
+                    group_name
+                    for _group_key, group_name, _display_order in definitions
+                ],
             )
-
-        groups_by_key = {}
-        for group_key, group_name, display_order in definitions:
-            category_group = groups_by_name[group_name]
-            if category_group.display_order != display_order:
-                raise CommandError(
-                    f'原稿種別「{group_name}」の表示順が初期値と一致しません。'
-                )
-            groups_by_key[group_key] = category_group
-        return groups_by_key
+        }
+        return {
+            group_key: groups_by_name[group_name]
+            for group_key, group_name, _display_order in definitions
+        }
 
     # 初期投入の対象テーブルに既存データがないことを確認する。
     def _validate_target_is_empty(self):
         target_models = (
+            ('原稿種別', CategoryGroup),
             ('記事', Kijis),
             ('内容分類', Bunrui),
             ('カテゴリ', Category),
@@ -486,6 +476,7 @@ class Command(BaseCommand):
             batch_size=BATCH_SIZE,
         )
         return {
+            'category_groups': len(category_groups_by_key),
             'articles': len(source_data['article_ids']),
             'bunrui': len(source_data['bunrui_rows']),
             'categories': len(initial_data['category_rows']),
@@ -499,7 +490,8 @@ class Command(BaseCommand):
             synchronization_statistics,
         )
         return (
-            f" 初期投入: 記事ID {seed_counts['articles']}件、"
+            f" 初期投入: 原稿種別 {seed_counts['category_groups']}件、"
+            f"記事ID {seed_counts['articles']}件、"
             f"内容分類ID {seed_counts['bunrui']}件、"
             f"カテゴリ {seed_counts['categories']}件、"
             f"巻 {seed_counts['years']}件、号 {seed_counts['months']}件。"

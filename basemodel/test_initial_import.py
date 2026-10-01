@@ -1,56 +1,12 @@
 from io import StringIO
-from importlib import import_module
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connections
-from django.test import SimpleTestCase, TestCase
+from django.test import TestCase
 
 from list.models import Bunrui, Category, CategoryGroup, Kijis
 from search.models import Month, Year
-
-from .management.commands.initialize_search_db import Command
-
-
-# 初期CSVの原稿種別対応が、既存migrationの履歴と一致することを確認する。
-class InitialCategoryDataCompatibilityTests(SimpleTestCase):
-    # 原稿種別の名称・表示順と全カテゴリの所属を確認する。
-    def test_category_data_matches_existing_migration_definition(self):
-        migration_module = import_module(
-            'list.migrations.0006_category_group_admin'
-        )
-        migration_definitions = (
-            migration_module.INITIAL_MANUSCRIPT_TYPE_CATEGORY_GROUPS
-        )
-        command = Command()
-        category_group_definitions = command._load_category_group_definitions()
-        category_rows = command._load_category_rows()
-
-        self.assertEqual(
-            [
-                (group_name, display_order)
-                for _group_key, group_name, display_order
-                in category_group_definitions
-            ],
-            [
-                (group_name, position)
-                for position, (group_name, _category_ids)
-                in enumerate(migration_definitions, start=1)
-            ],
-        )
-        self.assertEqual(
-            {
-                category_id: group_key
-                for category_id, _category_name, group_key in category_rows
-            },
-            {
-                category_id: f'group_{position:02d}'
-                for position, (_group_name, category_ids)
-                in enumerate(migration_definitions, start=1)
-                for category_id in category_ids
-            },
-        )
-
 
 # 空の検索用DBへ初期投入して旧DB同期できることを確認する。
 class InitializeSearchDbCommandTests(TestCase):
@@ -135,11 +91,14 @@ class InitializeSearchDbCommandTests(TestCase):
 
     # 初期投入がIDを維持し、同期済みの検索データを作る。
     def test_apply_seeds_and_synchronizes_an_empty_database(self):
+        self.assertFalse(CategoryGroup.objects.exists())
+
         call_command('initialize_search_db', '--apply', stdout=StringIO())
 
         self.assertEqual(set(Kijis.objects.values_list('id', flat=True)), {1001, 2003})
         self.assertEqual(set(Bunrui.objects.values_list('id', flat=True)), {1, 501})
         self.assertEqual(Category.objects.count(), 206)
+        self.assertEqual(CategoryGroup.objects.count(), 25)
         self.assertEqual(Year.objects.count(), 66)
         self.assertEqual(Month.objects.count(), 786)
 
@@ -160,11 +119,17 @@ class InitializeSearchDbCommandTests(TestCase):
         )
         self.assertEqual(Category.objects.get(id=1).group.name, '学位論文紹介')
         self.assertEqual(Category.objects.get(id=2).group.name, 'その他')
+        self.assertEqual(
+            CategoryGroup.objects.get(name='学位論文紹介').display_order,
+            14,
+        )
         self.assertEqual(Year.objects.get(id=1).volume, 1)
         self.assertEqual(Month.objects.get(id=1).start_page, 1)
 
     # 検証モードが検索用DBを空のまま保持する。
     def test_dry_run_rolls_back_all_initial_data(self):
+        self.assertFalse(CategoryGroup.objects.exists())
+
         call_command('initialize_search_db', '--dry-run', stdout=StringIO())
 
         self.assertFalse(Kijis.objects.exists())
@@ -172,11 +137,18 @@ class InitializeSearchDbCommandTests(TestCase):
         self.assertFalse(Category.objects.exists())
         self.assertFalse(Year.objects.exists())
         self.assertFalse(Month.objects.exists())
-        self.assertEqual(CategoryGroup.objects.count(), 25)
+        self.assertFalse(CategoryGroup.objects.exists())
 
     # テスト用DBや既存DBを上書きしないことを確認する。
     def test_apply_rejects_a_nonempty_target_database(self):
         Kijis.objects.create(title='既存の記事')
+
+        with self.assertRaisesMessage(CommandError, '既存データがあります'):
+            call_command('initialize_search_db', '--apply', stdout=StringIO())
+
+    # 原稿種別だけがあるDBも、初回投入対象として上書きしない。
+    def test_apply_rejects_a_target_with_existing_category_groups(self):
+        CategoryGroup.objects.create(name='既存の原稿種別', display_order=1)
 
         with self.assertRaisesMessage(CommandError, '既存データがあります'):
             call_command('initialize_search_db', '--apply', stdout=StringIO())
