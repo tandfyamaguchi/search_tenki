@@ -1,0 +1,6 @@
+/* ヘッダー画像の高さを制限する */
+.header-image {
+    display: block;
+    max-height: 500px;
+    margin: 0 auto;
+}

@@ -1,5 +1,6 @@
 from urllib.parse import parse_qs
 
+from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
@@ -7,7 +8,7 @@ from django.urls import reverse
 
 from search.models import Month, Year
 
-from .models import Author, Bunrui, Category, Kijis, Keyword
+from .models import ArticleAuthor, Author, Bunrui, Category, Kijis, Keyword
 from .templatetags.mypaginator import sort_url
 
 
@@ -844,3 +845,238 @@ class ArticleSortingHeaderTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['sort_field'], 'publication')
         self.assertEqual(response.context['sort_direction'], 'desc')
+
+
+# 記事を主運用するadminの追加・著者・破棄操作を確認する。
+class ArticleAdminTests(TestCase):
+    # 記事入力に必要な発行管理と関連データを用意する。
+    @classmethod
+    def setUpTestData(cls):
+        cls.year = Year.objects.create(year=2019, volume=66)
+        cls.issue_one = Month.objects.create(
+            volume=cls.year,
+            no=1,
+            start_page=3,
+        )
+        cls.issue_two = Month.objects.create(
+            volume=cls.year,
+            no=2,
+            start_page=113,
+        )
+        cls.category = Category.objects.create(name='解説')
+        cls.bunrui = Bunrui.objects.create(name='気候')
+        cls.first_author = Author.objects.create(name='著者A')
+        cls.keyword = Keyword.objects.create(name='気候変動')
+        cls.admin_user = get_user_model().objects.create_superuser(
+            username='article-admin',
+            email='article-admin@example.invalid',
+            password='test-password',
+        )
+
+    # 各テストを全権限の管理者として実行する。
+    def setUp(self):
+        self.client.force_login(self.admin_user)
+
+    # 記事追加フォームへ送信する共通データを作る。
+    def article_form_data(self, **overrides):
+        data = {
+            'title': '管理画面から追加した記事',
+            'volume': str(self.year.volume),
+            'no': str(self.issue_one.no),
+            'startpage': '3',
+            'pdf': '2026/example.pdf',
+            'category': str(self.category.pk),
+            'bunrui': [str(self.bunrui.pk)],
+            'keyword': [str(self.keyword.pk)],
+            'author_links-TOTAL_FORMS': '1',
+            'author_links-INITIAL_FORMS': '0',
+            'author_links-MIN_NUM_FORMS': '0',
+            'author_links-MAX_NUM_FORMS': '1000',
+            'author_links-0-display_order': '1',
+            'author_links-0-author': str(self.first_author.pk),
+        }
+        data.update(overrides)
+        return data
+
+    # 既存記事を変更・削除テスト用に作成する。
+    def create_article_with_author(self):
+        article = Kijis.objects.create(
+            title='既存記事',
+            volume=str(self.year.volume),
+            no=str(self.issue_one.no),
+            startpage=3,
+            category=self.category,
+        )
+        article.bunrui.add(self.bunrui)
+        article.keyword.add(self.keyword)
+        relation = ArticleAuthor.objects.create(
+            kijis=article,
+            author=self.first_author,
+            display_order=1,
+        )
+        return article, relation
+
+    # 記事追加画面には巻・号選択と、未保存入力を破棄する導線を表示する。
+    def test_add_form_shows_publication_author_and_discard_controls(self):
+        response = self.client.get(reverse('admin:list_kijis_add'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="id_volume"')
+        self.assertContains(response, 'id="id_no"')
+        self.assertContains(response, '著者（公開表示順）')
+        self.assertContains(response, 'id="id_author_links-0-author"')
+        self.assertContains(response, '入力を破棄して記事一覧へ戻る', count=2)
+        self.assertContains(response, 'data-discard-article', count=2)
+        self.assertContains(response, 'list/js/article_admin.js')
+
+    # 号の操作リンクから渡す巻・号を初期値として表示できる。
+    def test_add_form_accepts_initial_publication_from_query_parameters(self):
+        response = self.client.get(
+            reverse('admin:list_kijis_add'),
+            {'volume': self.year.volume, 'no': self.issue_two.no},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context['adminform'].form
+        self.assertEqual(form['volume'].value(), str(self.year.volume))
+        self.assertEqual(form['no'].value(), str(self.issue_two.no))
+
+    # 記事追加時に指定した著者表示順を公開画面でも使う。
+    def test_add_article_saves_and_publishes_specified_author_order(self):
+        second_author = Author.objects.create(name='著者B')
+        data = self.article_form_data(
+            **{
+                'author_links-TOTAL_FORMS': '2',
+                'author_links-0-display_order': '2',
+                'author_links-0-author': str(self.first_author.pk),
+                'author_links-1-display_order': '1',
+                'author_links-1-author': str(second_author.pk),
+            }
+        )
+
+        response = self.client.post(reverse('admin:list_kijis_add'), data)
+
+        self.assertEqual(response.status_code, 302)
+        saved_article = Kijis.objects.get(title='管理画面から追加した記事')
+        self.assertEqual(
+            list(
+                ArticleAuthor.objects.filter(kijis=saved_article).values_list(
+                    'author__name',
+                    'display_order',
+                )
+            ),
+            [('著者B', 1), ('著者A', 2)],
+        )
+
+        public_response = self.client.get(
+            reverse('list:ShowList1', kwargs={'id': self.issue_one.pk})
+        )
+        self.assertEqual(public_response.status_code, 200)
+        public_article = next(
+            listed_article
+            for listed_article in public_response.context['page_obj']
+            if listed_article.pk == saved_article.pk
+        )
+        self.assertEqual(
+            [author.name for author in public_article.ordered_authors],
+            ['著者B', '著者A'],
+        )
+
+    # 同じ著者や同じ表示順を複数行に登録できない。
+    def test_add_article_rejects_duplicate_author_and_display_order(self):
+        second_author = Author.objects.create(name='重複確認用著者')
+        data = self.article_form_data(
+            **{
+                'author_links-TOTAL_FORMS': '2',
+                'author_links-1-display_order': '1',
+                'author_links-1-author': str(second_author.pk),
+            }
+        )
+
+        response = self.client.post(reverse('admin:list_kijis_add'), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '同じ表示順は指定できません。')
+        self.assertFalse(Kijis.objects.filter(title='管理画面から追加した記事').exists())
+
+    # 著者行の削除は、著者名ではなく記事との関連だけを外す。
+    def test_change_form_can_unlink_an_author_without_deleting_name(self):
+        article, relation = self.create_article_with_author()
+        data = self.article_form_data(
+            **{
+                'title': article.title,
+                'volume': article.volume,
+                'no': article.no,
+                'startpage': str(article.startpage),
+                'pdf': '',
+                'author_links-TOTAL_FORMS': '1',
+                'author_links-INITIAL_FORMS': '1',
+                'author_links-0-id': str(relation.pk),
+                'author_links-0-display_order': '1',
+                'author_links-0-author': str(self.first_author.pk),
+                'author_links-0-DELETE': 'on',
+                '_save': '保存',
+            }
+        )
+
+        response = self.client.post(
+            reverse('admin:list_kijis_change', args=(article.pk,)),
+            data,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ArticleAuthor.objects.filter(pk=relation.pk).exists())
+        self.assertTrue(Author.objects.filter(pk=self.first_author.pk).exists())
+
+    # 未使用の著者だけを削除でき、使用中の著者は削除画面にも進めない。
+    def test_author_deletion_is_limited_to_unused_names(self):
+        article, _relation = self.create_article_with_author()
+        unused_author = Author.objects.create(name='未使用の著者')
+
+        used_delete_url = reverse('admin:list_author_delete', args=(self.first_author.pk,))
+        unused_delete_url = reverse('admin:list_author_delete', args=(unused_author.pk,))
+        changelist_response = self.client.get(
+            reverse('admin:list_author_changelist')
+        )
+        self.assertContains(changelist_response, '使用中の記事数')
+        self.assertContains(changelist_response, '使用中')
+        self.assertContains(changelist_response, unused_delete_url)
+        self.assertEqual(self.client.get(used_delete_url).status_code, 403)
+        self.assertEqual(self.client.get(unused_delete_url).status_code, 200)
+
+        response = self.client.post(unused_delete_url, {'post': 'yes'})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Kijis.objects.filter(pk=article.pk).exists())
+        self.assertTrue(Author.objects.filter(pk=self.first_author.pk).exists())
+        self.assertFalse(Author.objects.filter(pk=unused_author.pk).exists())
+
+    # 著者一覧では、未使用の著者だけに削除操作を表示する。
+    def test_author_changelist_shows_delete_link_only_for_unused_names(self):
+        self.create_article_with_author()
+        unused_author = Author.objects.create(name='未使用の著者')
+
+        response = self.client.get(reverse('admin:list_author_changelist'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse('admin:list_author_delete', args=(unused_author.pk,)),
+        )
+        self.assertNotContains(
+            response,
+            reverse('admin:list_author_delete', args=(self.first_author.pk,)),
+        )
+        self.assertContains(response, '使用中')
+
+    # 破棄リンクは新規追加画面だけに表示し、既存記事の編集画面には出さない。
+    def test_discard_link_is_only_shown_while_adding_article(self):
+        article, _relation = self.create_article_with_author()
+
+        add_response = self.client.get(reverse('admin:list_kijis_add'))
+        change_response = self.client.get(
+            reverse('admin:list_kijis_change', args=(article.pk,))
+        )
+
+        self.assertContains(add_response, '入力を破棄して記事一覧へ戻る')
+        self.assertNotContains(change_response, '入力を破棄して記事一覧へ戻る')

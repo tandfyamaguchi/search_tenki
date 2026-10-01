@@ -32,6 +32,8 @@
                             <!-- JavaScriptが無効でも、すべてのチェックボックスをそのまま操作できる。 -->
                             <section class="category-picker" data-category-picker aria-labelledby="category-picker-heading">
                                 <h3 id="category-picker-heading" class="category-picker__visually-hidden">カテゴリ</h3>
+                                <label for="category-filter" class="category-picker__filter-label">カテゴリを絞り込む</label>
+                                <p class="category-picker__help">複数選択は「いずれか」に一致します。</p>
                                 <input id="category-filter" class="form-control category-picker__filter" type="search" placeholder="カテゴリ名で絞り込む" autocomplete="off" aria-controls="category-options" aria-describedby="category-match-status">
                                 <div class="category-picker__controls">
                                     <button id="category-select-all" class="btn btn-outline-secondary btn-sm" type="button" aria-controls="category-options" aria-label="すべてのカテゴリを選択" disabled>全て選択（全カテゴリ）</button>

@@ -1,0 +1,85 @@
+{% extends "admin/change_form.html" %}
+
+{% block field_sets %}
+<!-- 既存の巻では、巻番号・発行年を変更せず発行管理だけを行う。 -->
+{% if not original %}
+{{ block.super }}
+{% endif %}
+{% endblock %}
+
+{% block submit_buttons_top %}
+<!-- 既存の巻では保存項目がないため、保存ボタンを表示しない。 -->
+{% if not original %}
+{{ block.super }}
+{% endif %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+<!-- 既存の巻では保存項目がないため、保存ボタンを表示しない。 -->
+{% if not original %}
+{{ block.super }}
+{% endif %}
+{% endblock %}
+
+{% block after_field_sets %}
+{{ block.super }}
+<!-- 巻を起点に号と記事追加を扱う発行管理表を表示する。 -->
+<fieldset class="module aligned">
+    <h2>発行管理</h2>
+    <p>第{{ original.volume }}巻（{{ original.year }}年）｜登録号: {{ issue_summary }}</p>
+
+    <table id="publication-issue-list">
+        <thead>
+            <tr>
+                <th scope="col">No.</th>
+                <th scope="col">開始頁</th>
+                <th scope="col">記事数</th>
+                <th scope="col">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for issue in issue_rows %}
+            <tr>
+                <th scope="row">{{ issue.no }}</th>
+                <td>{{ issue.start_page }}</td>
+                <td>{% if can_view_articles %}{{ issue.article_count }}{% else %}—{% endif %}</td>
+                <td>
+                    {% if can_add_articles %}
+                    <a href="{{ issue.article_add_url }}">この号に記事を追加</a>
+                    {% endif %}
+                    {% if can_change_articles %}
+                    {% if can_add_articles %} ｜ {% endif %}
+                    <a href="{{ issue.article_changelist_url }}">この号の記事を編集</a>
+                    {% elif can_view_articles %}
+                    {% if can_add_articles %} ｜ {% endif %}
+                    <a href="{{ issue.article_changelist_url }}">この号の記事を見る</a>
+                    {% endif %}
+                    {% if can_change_issues %}
+                    {% if can_add_articles or can_view_articles %} ｜ {% endif %}
+                    <a href="{{ issue.change_url }}">号を編集</a>
+                    {% endif %}
+                    {% if not can_add_articles and not can_view_articles and not can_change_issues %}—{% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">登録済みの号はありません。</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p>
+        {% if add_issue_url %}
+        <a class="button" href="{{ add_issue_url }}">号を追加</a>
+        {% endif %}
+    </p>
+    {% if original %}
+    <!-- 入力欄のない既存巻でも、発行管理から安全に戻れる導線を表示する。 -->
+    <div class="submit-row">
+        {% url 'admin:search_year_changelist' as discard_url %}
+        {% include "admin/includes/discard_link.html" %}
+    </div>
+    {% endif %}
+</fieldset>
+{% endblock %}

@@ -64,7 +64,9 @@
  |-makemonth.sh
  |-makemonth.csv
  |-category.csv
-
+ 
+各アプリ配下の static/ は、CSS・JS・画像などの元ファイルです。
+プログラム直下の static/ は、collectstatic が各アプリと Django admin の静的ファイルを一か所へ集約した本番配信用の出力先です。このフォルダー内は編集しません。
 #------------
 views,formsの構造
 serch/views.py

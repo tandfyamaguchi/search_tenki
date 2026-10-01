@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # 開発環境でのみ既定として許可するホストを定義する。
-DEVELOPMENT_ALLOWED_HOSTS = ('localhost', '127.0.0.1', '[::1]')
+DEVELOPMENT_ALLOWED_HOSTS = ('localhost', '127.0.0.1', '[::1]', 'tfsnow.pythonanywhere.com')
 
 
 # 文字列の環境変数を真偽値として厳密に読み取る。
@@ -89,6 +89,8 @@ DEBUG, SECRET_KEY, ALLOWED_HOSTS = load_environment_settings()
 
 INSTALLED_APPS = [
     'basemodel.apps.BasemodelConfig',
+    # 空の検索用DBへ初回データを投入するコマンドを登録する。
+    'maketable.apps.MaketableConfig',
     'list.apps.ListConfig',
     'search.apps.SearchConfig',
     'home.apps.HomeConfig',

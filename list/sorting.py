@@ -197,7 +197,8 @@ def apply_article_sort(queryset, request):
         first_author_name = (
             article_author.objects.using(queryset.db)
             .filter(kijis_id=OuterRef('pk'))
-            .order_by('id')
+            # 公開時の先頭著者と同じ順で、著者列を並べ替える。
+            .order_by('display_order', 'id')
             .values('author__name')[:1]
         )
         source = Subquery(first_author_name, output_field=CharField())

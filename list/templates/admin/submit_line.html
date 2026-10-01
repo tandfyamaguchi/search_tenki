@@ -1,0 +1,8 @@
+{% extends "admin/submit_line.html" %}
+
+{% block submit-row %}
+{{ block.super }}
+{% if not is_popup %}
+{% include "admin/includes/discard_link.html" %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<!-- 記事の主運用へ迷わず進めるよう、管理ホームの先頭に案内を置く。 -->
+<div id="content-main">
+    <div class="module" id="article-operation-guide">
+        <table>
+            <caption>日常の操作</caption>
+            <tbody>
+                <tr>
+                    <th scope="row">記事を追加・編集する</th>
+                    <td>
+                        <a href="{% url 'admin:search_year_changelist' %}">発行管理の「巻」</a>
+                        を開き、対象の巻 → 号の「この号に記事を追加」または
+                        「この号の記事を編集」から操作します。
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+{% endblock %}

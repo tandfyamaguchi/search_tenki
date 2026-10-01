@@ -4,42 +4,30 @@
 
 ## 1. 構成とデータの扱い
 
-このアプリケーションは Django による記事検索サイトです。公開画面は検索専用です。初回導入時にはPythonの同期コマンドで旧DBから検索用DBへ同期し、稼働開始後の巻・号などの通常操作は Django admin（`/admin/`）で行います。adminで操作できる範囲と制限は [README.md](README.md) を参照してください。
+初回導入時だけ、空の検索用DBへ初期データを投入してから旧DBを同期します。同期完了後の編集はDjango admin（`/admin/`）で行い、旧DB同期を再実行しません。
 
 |対象|用途|運用上の扱い|
 |---|---|---|
-|`db.sqlite3`|検索記事、巻・号、認証、admin の操作履歴を保持する運用DB|永続領域に置き、アプリケーション実行ユーザーだけに読み書きを許可する|
-|`etenki.db`|旧データの参照元（`kiji`、`naiyou`）|変更禁止の参照用データとして扱い、OSのファイル権限で書き込みを禁止する|
+|`db.sqlite3`|検索記事、巻・号、カテゴリ・原稿種別、認証、adminの操作履歴を保持する運用DB|読み書き可|
+|`etenki.db`|旧データの参照元（`kiji`、`naiyou`）|変更禁止の参照用データ|
+|`maketable/`|初回導入専用のCSVと`initialize_search_db`コマンド|初回導入以外では使用しない|
 |`static/`|`collectstatic` が出力する静的ファイル|Webサーバーが配信する|
 
-現行の設定では、DBのパスはアプリケーション直下の固定名です。新しいリリースを配置するときに、稼働中の `db.sqlite3` や `etenki.db` を無条件で上書きしてはいけません。導入前に、データ担当者が承認した同一時点の2ファイルを対として用意してください。
+> **重要:** 初回導入では、テスト用や旧環境の`db.sqlite3`を配置しません。空の`db.sqlite3`へ`migrate`を適用した後、`initialize_search_db`を実行します。このコマンドは、`etenki.db`の記事ID・内容分類IDを保った初期レコード、カテゴリ、巻・号を投入し、そのまま旧DBの内容を同期します。`etenki.db`は読み取り専用で、コマンドは変更しません。
 
-`etenki.db` はコード上でSQLiteの強制読み取り専用モードにはなっていません。Django admin の操作対象でもありませんが、ファイルを直接操作すれば変更できてしまいます。アプリケーション実行ユーザーにこのファイルの書き込み権限を与えないでください。
+`list.0006_category_group_admin` は初回の原稿種別25件を作成します。続く`initialize_search_db`が、承認済みの`category.csv`にあるカテゴリID 1〜206へ原稿種別を付けて投入します。`list.0007_require_category_group`により、カテゴリは原稿種別なしで保存できません。初期投入中にエラーが出た場合は本番DBを手作業で変更せず、空のステージングDBと`maketable/`内のCSV、`etenki.db`を確認してください。
 
-> **重要:** 初回導入では `makemodel` で旧DBから検索用DBへ同期します。ただし、このコマンドは空の `db.sqlite3` を初期投入するものではありません。旧DBと検索用DBの記事ID・内容分類IDが一致することを最初に確認するため、`migrate` 直後の空DBに対して実行すると失敗します。同期前に、ID集合が対応済みの初期 `db.sqlite3`（同梱の初期データまたは承認済みのベースDB）を配置してください。
-
-## 2. 導入前の準備
-
-
-- インターネット公開時は、HTTPS終端、HTTPからHTTPSへの誘導、adminへのアクセス制限を担うリバースプロキシまたはPaaSの設定を用意します。
-- SQLiteは同時書き込みに向きません。admin操作、バックアップ、リリース時のDB更新が重ならない運用としてください。複数の書き込み系アプリケーションプロセスを同時に動かさないでください。
-- バックアップの保存先は、アプリケーション配置先とは別の永続領域を使用します。復元手順は本番投入前にステージング環境で確認してください。
-
-このリポジトリには、Webサーバー、WSGIワーカー、サービス管理、コンテナの設定は含まれていません。これらはインフラ担当者が組織の標準に従って用意します。WSGIの起点は `mysite.wsgi:application` です。
-
-## 3. 環境構築
+## 2. 環境構築
 
 以下のテスト環境と同じ構成を作る手順です。
-- Miniconda の `search-tenki-dj52` 環境
+
+- Minicondaの `search-tenki-dj52` 環境
 - Python 3.12
 - Django 5.2 LTS
 
 ### Minicondaの導入
 
- [Anaconda公式のMiniconda配布ページ](https://www.anaconda.com/download) から取得してください。
-
-
-
+[Anaconda公式のMiniconda配布ページ](https://www.anaconda.com/download) から取得してください。
 
 ### `search-tenki-dj52` 環境の作成
 
@@ -57,11 +45,15 @@ python -m pip install "Django>=5.2,<5.3"
 python --version
 python -m django --version
 ```
-
-
 以後の `python manage.py` コマンドは、すべて `conda activate search-tenki-dj52` を実行した状態で使用します。
 
-次に、 `db.sqlite3` と `etenki.db` を配置します。初回同期前の `db.sqlite3` は、`etenki.db` と記事ID・内容分類IDが対応したベースDBでなければなりません。`db.sqlite3` と、そのSQLiteのジャーナルファイルを作成できるディレクトリには、アプリケーション実行ユーザーの書き込み権限が必要です。一方、`etenki.db` は実行ユーザーが読めるが書けない権限にします。
+## 3. プログラム類の導入
+
+GitHubの
+https://github.com/tandfyamaguchi/search_tenki/tree/202609
+の「Code」＞「Download Zip」で、プログラム類をダウンロードします。
+`db.sqlite3`は削除して、./search_tenkiに保存します。
+初回導入では、既存・同梱の`db.sqlite3`をコピーしません。後述の手順で空の`db.sqlite3`を作成します。
 
 ## 4. 本番用環境変数
 
@@ -77,15 +69,21 @@ export DJANGO_ALLOWED_HOSTS='search.example.invalid,admin.example.invalid'
 - `DJANGO_ALLOWED_HOSTS` はカンマ区切りです。本番では空にできません。
 - `DJANGO_DEBUG=0` のとき、`DJANGO_SECRET_KEY` または `DJANGO_ALLOWED_HOSTS` が未設定なら起動時に失敗します。
 
-現行コードにはHTTPS強制、HSTS、Secure Cookie、プロキシのHTTPSヘッダー設定は含まれていません。インターネット公開前に `python manage.py check --deploy` を実行し、表示される警告への対処方針をインフラ担当者とアプリケーション担当者で確認してください。adminは少なくともHTTPS、VPNまたはIP制限などで保護します。
+確認コマンド:
+```sh
+python manage.py check --deploy
+```
 
-## 5. スキーマ、初期同期、静的ファイル、管理者アカウント
-
-以下のコマンドは、まずステージング環境で実施・確認します。本番で実行する場合は、DBバックアップと変更承認の後に限ります。
+## 5. 空DBの作成、初期同期、静的ファイル、管理者アカウント
+本番へ適用する前に、テスト環境で次を実行します。
 
 ```sh
 cd ./search_tenki
 conda activate search-tenki-dj52
+
+# 既存の運用DBを上書きしないことを確認して、空DBを作成する
+test ! -e db.sqlite3
+touch db.sqlite3
 
 # 予定されるスキーマ変更を確認する
 python manage.py migrate --database=default --plan
@@ -93,30 +91,31 @@ python manage.py migrate --database=default --plan
 # 承認されたスキーマ変更だけを適用する
 python manage.py migrate --database=default
 
+# 初期投入と旧DB同期を検証する。検索用DBへの変更はロールバックされる
+python manage.py initialize_search_db --dry-run
+
+# 検証結果を承認後、初期投入と旧DB同期を確定する
+python manage.py initialize_search_db --apply
+
 # Webサーバーが配信する静的ファイルを集約する
 python manage.py collectstatic --noinput
 ```
 
 `migrate --database=etenki` は絶対に実行しないでください。旧DBに本来不要なテーブルを作成するおそれがあります。通常の運用DBは必ず `default`（`db.sqlite3`）です。
 
-### 初回導入時の旧DB同期
+`migrate`直後の空DBには、原稿種別25件だけが作成され、カテゴリ・記事・内容分類・巻・号はまだありません。`initialize_search_db`は、すべての`default`マイグレーションが適用済みで、これらの初期投入対象テーブルが空であることを確認してから実行します。既存データがある場合は停止するため、テスト用や運用中のDBを上書きしません。
 
-ベースDBを配置し、`default` のマイグレーションを確認した後、初回導入時に限って旧DBとの同期を行います。adminで巻・号の運用を始める前に、必ず検証モードから実行してください。
+### 初回導入専用コマンド
 
-```sh
-# 同期内容を検証する。検索用DBへの変更はロールバックされる
-python manage.py makemodel --dry-run
+初回のみ使用するCSVとコマンドはすべて`maketable/`にまとめています。`initialize_search_db`は、記事ID・内容分類IDを`etenki.db`と同じ値で作成し、`category.csv`、`makeyear.csv`、`makemonth.csv`からカテゴリ・巻・号を投入した後、既存の同期処理を実行します。CSVは承認済みの固定初期データであり、内容を変更したり同フォルダーの旧シェルスクリプトで再生成したりしません。初期投入と同期は1つのトランザクションなので、失敗時や`--dry-run`時に`db.sqlite3`へ途中データは残りません。
 
-# 検証結果を承認後、旧DBの内容を検索用DBへ同期する
-python manage.py makemodel
+旧DBにある著者・キーワードの表記は、初回同期時に整形せずそのまま引き継ぎます。旧DBのデータを修正する必要がある場合は、同期完了後にDjango adminで管理します。
 
-# 同期後のカテゴリ設定を読み取り専用で確認する
-python manage.py validate_category_groups
-```
+`initialize_search_db`は`--dry-run`または`--apply`のどちらかを必ず指定します。`--apply`は空DBに対して一度だけ実行します。初回同期後は、`initialize_search_db`と`makemodel`を再実行してはいけません。以後の記事・巻・号・カテゴリ・内容分類・キーワードの更新はadminで行います。
 
-通常の `makemodel` は `db.sqlite3` を更新します。初回同期が終わった後は、旧DBのデータを更新する必要が生じた場合を除き、通常のリリースや巻・号追加のためにこのコマンドを実行しません。再同期が必要な場合の承認・バックアップ手順は [README.md](README.md) を参照してください。
+`etenki.db`にだけ存在するカテゴリや、CSV・原稿種別の不整合がある場合、`initialize_search_db`は書き込み前に停止します。CSVや本番DBを手作業で変更せず、原因を確認してから初回導入をやり直してください。
 
-初回の管理者アカウントは、DBを配置し、マイグレーションと初回同期を完了した後に作成します。パスワードは対話入力し、コマンドライン引数に渡しません。
+初回の管理者アカウントは、空DB作成、マイグレーション、初回同期を完了した後に作成します。パスワードは対話入力し、コマンドライン引数に渡しません。
 
 ```sh
 python manage.py createsuperuser --username '<管理者ID>'
@@ -124,44 +123,23 @@ python manage.py createsuperuser --username '<管理者ID>'
 
 `createsuperuser` で作成した利用者は、adminへのログインと全管理権限を持ちます。共用アカウントや同梱DB中の既存アカウントを流用せず、担当者ごとに個別アカウントを作成してください。権限を絞る運用は、初期管理者がadminの「ユーザー」「グループ」で設定します。
 
-## 6. Webサーバーへの接続
-
-本番では `python manage.py runserver` を使用しません。インフラ担当者が選んだWSGI対応のアプリケーションサーバーから、`search-tenki-dj52` 環境のPythonで `mysite.wsgi:application` を起動し、リバースプロキシ経由で公開します。
-
-静的ファイルの出力先は `STATIC_ROOT`（このプロジェクトでは `python_GPT2/static/`）です。`collectstatic` の後、Webサーバーがこの出力先の静的URLを配信できるよう設定してください。Djangoアプリケーションだけで本番用静的ファイルを配信する構成にはしません。
-
-adminを公開経路に置く場合は、公開検索画面と同じドメインでも別のドメインでも構いませんが、`DJANGO_ALLOWED_HOSTS` にアクセスに使うホスト名を含めます。実在する本番URLをこの文書へ記載しないでください。
-
-## 7. 導入後の確認
-
-本番データを変更しない確認から順に実施します。
-
-```sh
-python manage.py check
-python manage.py check --deploy
-python manage.py validate_category_groups
-```
-
-`validate_category_groups` は読み取り専用です。テストはテスト用DBを作成するため、本番環境ではなくステージング環境で実施します。
-
+## 6. ローカル環境でのテスト実行
 ```sh
 python manage.py test
+python manage.py check
+python -Wa manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py migrate --plan
+python manage.py runserver 127.0.0.1:8000 --noreload
 ```
 
-ブラウザーでは、次を確認します。
+http://127.0.0.1:8000/ で、以下を確認します。
 
 1. トップ画面、巻・号検索、詳細検索が表示されること。
 2. 静的ファイル（CSS、画像、Django adminの装飾）が読み込まれること。
 3. `/admin/` で作成した個別管理者アカウントがログインできること。
-4. adminで許可されたモデルだけが表示されること。操作対象の詳細は [README.md](README.md) を参照してください。
+4. adminで許可されたモデルだけが表示されること。操作対象と必要な権限の詳細は [README.md](README.md) を参照してください。
 
-## 8. 更新時のチェックリスト
+## 7. Webサーバーへの接続
 
-1. リリース対象と、永続化する `db.sqlite3`・`etenki.db` を分けて確認する。
-2. 運用DBのバックアップと復元可能性を確認する。
-3. ステージングで `check`、テスト、公開画面、adminログインを確認する。
-4. 本番ではメンテナンス時間を設け、adminによる書き込みとDB同期を止める。
-5. 必要な場合のみ `migrate --database=default` と `collectstatic --noinput` を実行する。
-6. 公開後に検索、静的ファイル、adminログイン、ログを確認する。
-
-初回導入では、上記の `makemodel` による旧DB同期を完了してからadmin運用を開始します。稼働開始後の通常リリースでは同期を含めず、旧DB更新に伴う再同期だけを [README.md](README.md) の承認手順に従って実施してください。
+静的ファイルの出力先は `STATIC_ROOT`（このプロジェクトでは `static/`）です。`collectstatic` の後、Webサーバーがこの出力先の静的URLを配信できるよう設定してください。Djangoアプリケーションだけで本番用静的ファイルを配信する構成にはしません。

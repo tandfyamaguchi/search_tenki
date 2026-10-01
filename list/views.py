@@ -73,7 +73,7 @@ def filter_by_search_expression(queryset, lookup, expression):
 
   return queryset
 
-# 著者を中間テーブルへの登録順で各記事へ設定する。
+# 著者を指定された公開表示順で各記事へ設定する。
 def attach_ordered_authors(page_obj):
   article_queryset = page_obj.object_list
   database_alias = article_queryset.db
@@ -87,7 +87,7 @@ def attach_ordered_authors(page_obj):
       article_author.objects.using(database_alias)
       .filter(kijis_id__in=article_ids)
       .select_related('author')
-      .order_by('id')
+      .order_by('display_order', 'id')
     )
     for relation in relations:
       authors_by_article[relation.kijis_id].append(relation.author)

@@ -1,0 +1,8 @@
+{% load admin_urls %}
+{# 保存していない入力を破棄し、親画面または一覧へ戻る共通リンク。 #}
+{% if discard_url %}
+<a href="{{ discard_url }}" class="closelink" data-discard-form>入力を破棄して元の画面に戻る</a>
+{% else %}
+{% url opts|admin_urlname:'changelist' as changelist_url %}
+<a href="{% add_preserved_filters changelist_url %}" class="closelink" data-discard-form>入力を破棄して元の画面に戻る</a>
+{% endif %}

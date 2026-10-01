@@ -92,8 +92,11 @@ BUNRUI_CHOICES = Bunrui.objects.annotate(
         output_field=IntegerField(),
     )
 ).order_by('bunrui_display_order', 'id')
-# カテゴリは登録IDの昇順で表示する。
-CATEGORY_CHOICES = Category.objects.order_by('id')
+# カテゴリは原稿種別、登録IDの順で取得し、詳細検索ではDBの分類順を使う。
+CATEGORY_CHOICES = Category.objects.select_related('group').order_by(
+    'group__display_order',
+    'id',
+)
 VOLUME_CHOICES = Year.objects.all().order_by('id').reverse()
 ORDER_CHOICES = ((0, "降順"),(1, "昇順"))
 PAGES_CHOICES = ((10,10),(30,30),(50,50),(100,100))

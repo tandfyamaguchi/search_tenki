@@ -14,6 +14,7 @@ MAX_VALIDATION_ERRORS = 20
 # 旧DBの記事を検索用DBへ差分同期するコマンドを定義する。
 class Command(BaseCommand):
     help = '旧DBの記事本体と関連データを検索用DBへ差分同期する。'
+    preserve_legacy_relation_values = False
 
     # コマンドライン引数を定義する。
     def add_arguments(self, parser):
@@ -31,8 +32,7 @@ class Command(BaseCommand):
         dry_run = options.get('dry_run', False)
         # 検索用DBへの全変更を1つのトランザクションにまとめる。
         with transaction.atomic(using=TARGET_DATABASE):
-            prepared_data = self._prepare_synchronization()
-            statistics = self._synchronize(prepared_data)
+            statistics = self.synchronize()
             if dry_run:
                 # 検証時は、全処理後に検索用DBへの変更だけを取り消す。
                 transaction.set_rollback(True, using=TARGET_DATABASE)
@@ -41,6 +41,12 @@ class Command(BaseCommand):
         if dry_run:
             return f'検証が完了しました。DBへの変更はロールバックしました。{summary}'
         return f'同期が完了しました。{summary}'
+
+    # 初回投入後の検索用DBを、旧DBの内容へ同期する。
+    def synchronize(self, preserve_legacy_relation_values=False):
+        self.preserve_legacy_relation_values = preserve_legacy_relation_values
+        prepared_data = self._prepare_synchronization()
+        return self._synchronize(prepared_data)
 
     # 同期前に記事IDと参照データを検証し、同期用のデータを準備する。
     def _prepare_synchronization(self):
@@ -94,6 +100,7 @@ class Command(BaseCommand):
             target_bunrui_by_id,
         )
         self._raise_validation_errors(validation_errors)
+        self._validate_category_names(category_names, category_by_name)
 
         return {
             'source_articles': source_articles,
@@ -104,7 +111,6 @@ class Command(BaseCommand):
             'author_by_name': author_by_name,
             'keyword_by_name': keyword_by_name,
             'desired_relations': desired_relations,
-            'category_names': category_names,
             'author_names': author_names,
             'keyword_names': keyword_names,
         }
@@ -156,6 +162,18 @@ class Command(BaseCommand):
                 f'{self._format_values(sorted(set(duplicate_names)))}'
             )
         return objects_by_name
+
+    # 原稿種別を持つ承認済みカテゴリだけを初回同期で使用する。
+    def _validate_category_names(self, source_category_names, category_by_name):
+        missing_names = sorted(set(source_category_names) - set(category_by_name))
+        if not missing_names:
+            return
+
+        raise CommandError(
+            '旧DBにあるカテゴリが検索用DBへ未登録です。'
+            '初回同期の前に、承認済みベースDBへ原稿種別付きで登録してください: '
+            f'{self._format_values(missing_names)}'
+        )
 
     # 旧DBの記事から、同期後に必要となる関連データを検証して作成する。
     def _prepare_desired_relations(
@@ -245,6 +263,10 @@ class Command(BaseCommand):
             return (), []
 
         values = tuple(raw_value.split(separator))
+        if self.preserve_legacy_relation_values:
+            # 初回移行では、旧DBに記録された表記を変更せずに引き継ぐ。
+            return values, []
+
         errors = []
         for value in values:
             if not value.strip():
@@ -291,12 +313,8 @@ class Command(BaseCommand):
             'authors_created': 0,
             'keywords_created': 0,
         }
-        statistics['categories_created'] = self._ensure_named_records(
-            Category,
-            'カテゴリ',
-            prepared_data['category_names'],
-            prepared_data['category_by_name'],
-        )
+        # カテゴリは原稿種別を持つ承認済みベースDBからだけ参照する。
+        statistics['categories_created'] = 0
         statistics['articles_updated'] = self._synchronize_articles(prepared_data)
         statistics['bunrui_updated'] = self._synchronize_bunrui_names(prepared_data)
         statistics['authors_created'] = self._ensure_named_records(
@@ -390,7 +408,7 @@ class Command(BaseCommand):
             )
         return len(bunrui_to_update)
 
-    # 未登録のカテゴリ、著者またはキーワードをまとめて登録し、名称辞書を更新する。
+    # 未登録の著者またはキーワードをまとめて登録し、名称辞書を更新する。
     def _ensure_named_records(self, model, label, names, objects_by_name):
         missing_names = sorted(set(names) - set(objects_by_name))
         if not missing_names:
@@ -424,32 +442,53 @@ class Command(BaseCommand):
         )
         return desired_pairs
 
-    # 著者の多対多関連を、旧DBの記載順も含めて差分同期する。
+    # 著者の多対多関連と公開表示順を、旧DBの記載順に合わせて差分同期する。
     def _synchronize_ordered_author_relations(self, desired_author_ids_by_article):
         through_model = Kijis.author.through
         existing_rows_by_article = {}
-        for relation_id, article_id, author_id in through_model.objects.using(
+        for relation_id, article_id, author_id, display_order in through_model.objects.using(
             TARGET_DATABASE
-        ).order_by('id').values_list('id', 'kijis_id', 'author_id'):
+        ).order_by('kijis_id', 'display_order', 'id').values_list(
+            'id',
+            'kijis_id',
+            'author_id',
+            'display_order',
+        ):
             existing_rows_by_article.setdefault(article_id, []).append(
-                (relation_id, author_id)
+                (relation_id, author_id, display_order)
             )
 
         relation_ids_to_delete = []
         rows_to_create = []
         for article_id in sorted(desired_author_ids_by_article):
             existing_rows = existing_rows_by_article.get(article_id, [])
-            existing_author_ids = tuple(author_id for _id, author_id in existing_rows)
+            existing_author_ids = tuple(
+                author_id for _id, author_id, _display_order in existing_rows
+            )
+            existing_display_orders = tuple(
+                display_order for _id, _author_id, display_order in existing_rows
+            )
             desired_author_ids = desired_author_ids_by_article[article_id]
-            if existing_author_ids == desired_author_ids:
+            desired_display_orders = tuple(
+                range(1, len(desired_author_ids) + 1)
+            )
+            if (
+                existing_author_ids == desired_author_ids
+                and existing_display_orders == desired_display_orders
+            ):
                 continue
 
             relation_ids_to_delete.extend(
-                relation_id for relation_id, _author_id in existing_rows
+                relation_id
+                for relation_id, _author_id, _display_order in existing_rows
             )
             rows_to_create.extend(
-                through_model(kijis_id=article_id, author_id=author_id)
-                for author_id in desired_author_ids
+                through_model(
+                    kijis_id=article_id,
+                    author_id=author_id,
+                    display_order=display_order,
+                )
+                for display_order, author_id in enumerate(desired_author_ids, start=1)
             )
 
         for relation_ids in self._chunked(relation_ids_to_delete):
