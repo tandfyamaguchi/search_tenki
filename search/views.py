@@ -1,35 +1,35 @@
 from django.shortcuts import get_object_or_404, render
-from .models import Year, Month
-from .forms import SearchDetailForm
 
-#全ての年(volume)を取得
+from .forms import SearchDetailForm
+from .models import Month, Year
+
+
+# 発行年と巻の一覧を表示する。
 def SelectYearView(request):
-    #Yearモデルのidを降順に並べて取得
-    list=Year.objects.order_by('id').reverse()
-    return render(request, "search/SelectYear.html",{'list' : list})
+    years = Year.objects.order_by('-id')
+    return render(request, 'search/SelectYear.html', {'list': years})
+
 
 # 選択した年度IDに紐づく号を表示する。
 def SelectNoView(request, year_id):
     # 存在しない年度IDは、DoesNotExistではなく404として扱う。
     year = get_object_or_404(Year, pk=year_id)
-    # 選択した年度に属する号と開始頁を、号番号順で取得する。
-    month_list = (
-        Month.objects.select_related('volume')
-        .filter(volume=year)
-        .order_by('no')
-    )
-    # 年度と巻番号をテンプレートの表示用データとして渡す。
+    # テンプレートでは各号の巻を参照しないため、JOINは不要である。
+    issues = Month.objects.filter(volume=year).order_by('no')
+    # 既存テンプレートとの互換性のため、コンテキストキーは維持する。
     return render(
         request,
-        "search/SelectNo.html",
-        {'list': month_list, 'vol': year.volume, 'year': year.year},
+        'search/SelectNo.html',
+        {'list': issues, 'vol': year.volume, 'year': year.year},
     )
 
-#検索画面のフォームを表示
+
+# 詳細検索フォームを表示する。
 def SearchDetailView(request):
     form = SearchDetailForm()
-    return render(request, "search/SearchDetail.html", {'form':form})
+    return render(request, 'search/SearchDetail.html', {'form': form})
 
-# 著作権案内ページを表示
+
+# 著作権案内ページを表示する。
 def CopyrightView(request):
-    return render(request, "search/copyright.html")
+    return render(request, 'search/copyright.html')

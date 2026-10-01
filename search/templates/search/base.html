@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     <!-- トップ画面と共通のヘッダー画像スタイルを読み込む。 -->
     <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <link rel="icon" href="{% static 'image/favicon.ico' %}">
     <!-- 共通レイアウト用のCSSを読み込む。 -->
     <link rel="stylesheet" href="{% static 'search/css/base.css' %}">
     <!-- 各画面専用のCSSを読み込む。 -->
@@ -22,9 +23,8 @@
 <body>
     <!--ヘッダー-->
     <header>
-        <link rel="icon" href="{% static 'image/favicon.ico' %}">
         <div class='header'>
-            <img class="search-header__image" src="/static/image/tenki_top.jpg"/>
+            <img class="search-header__image" src="{% static 'image/tenki_top.jpg' %}"/>
             <div class="text-center">
                 <h3>日本気象学会機関誌「天気」記事検索</h3>
             </div>
@@ -63,7 +63,7 @@
             </a><br>
             記事が表示されない等の不具合がありましたら，下記メールアドレスまでご連絡下さい。<br>
             <!-- メールアドレスを文字列として公開しないため、画像で表示する。 -->
-            <img src="/static/image/tenki_mail.png" alt="お問い合わせメールアドレス（画像）" width="189" height="22">
+            <img src="{% static 'image/tenki_mail.png' %}" alt="お問い合わせメールアドレス（画像）" width="189" height="22">
         </div>
     </footer>
 

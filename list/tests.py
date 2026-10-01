@@ -8,7 +8,15 @@ from django.urls import reverse
 
 from search.models import Month, Year
 
-from .models import ArticleAuthor, Author, Bunrui, Category, Kijis, Keyword
+from .models import (
+    ArticleAuthor,
+    Author,
+    Bunrui,
+    Category,
+    CategoryGroup,
+    Kijis,
+    Keyword,
+)
 from .templatetags.mypaginator import sort_url
 
 
@@ -451,7 +459,11 @@ class DetailSearchExpressionTests(TestCase):
 class ArticleListQueryCountTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        category = Category.objects.create(name='解説')
+        category_group = CategoryGroup.objects.create(
+            name='一覧件数テスト用原稿種別',
+            display_order=90,
+        )
+        category = Category.objects.create(name='解説', group=category_group)
         cls.classification = Bunrui.objects.create(name='気候')
         author = Author.objects.create(name='テスト著者')
         keyword = Keyword.objects.create(name='テスト用語')
@@ -509,6 +521,10 @@ class ArticleTextHeaderSortingTests(TestCase):
     # 文字種と空欄を含む記事を、意図した順とは異なるID順で用意する。
     @classmethod
     def setUpTestData(cls):
+        category_group = CategoryGroup.objects.create(
+            name='見出し並び替えテスト用原稿種別',
+            display_order=90,
+        )
         values = [
             ('あ2', 'あ2', 'あ2'),
             ('あ10', 'あ10', 'あ10'),
@@ -524,7 +540,10 @@ class ArticleTextHeaderSortingTests(TestCase):
         for title, category_name, author_name in values:
             category = None
             if category_name is not None:
-                category = Category.objects.create(name=category_name)
+                category = Category.objects.create(
+                    name=category_name,
+                    group=category_group,
+                )
             article = Kijis.objects.create(
                 category=category,
                 title=title,
@@ -750,7 +769,7 @@ class ArticleSortingHeaderTemplateTests(TestCase):
             title='表示確認', volume='1', no='1', startpage=1
         )
 
-    # 上下の見出しと、検索結果の交互のグレー背景を表示する。
+    # 上下の見出しと、検索結果用のスタイルシートを読み込む。
     def test_top_and_bottom_headers_are_styled_and_clickable(self):
         response = self.client.get(
             reverse('list:ShowList2'),
@@ -763,11 +782,7 @@ class ArticleSortingHeaderTemplateTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<tfoot>')
-        self.assertContains(response, 'background-color: #edf7d0;')
-        self.assertContains(response, 'tbody tr:nth-child(odd)')
-        self.assertContains(response, 'background-color: #f0f0f0;')
-        self.assertContains(response, 'tbody tr:nth-child(even)')
-        self.assertContains(response, 'background-color: #fafafa;')
+        self.assertContains(response, '/static/list/css/search-results.css')
         self.assertContains(response, 'sort=title', count=2)
         self.assertContains(response, 'direction=desc', count=2)
         self.assertContains(response, 'aria-sort="ascending"', count=1)
@@ -847,6 +862,34 @@ class ArticleSortingHeaderTemplateTests(TestCase):
         self.assertEqual(response.context['sort_direction'], 'desc')
 
 
+# 検索結果のページ番号を、Django標準の省略形式で表示することを確認する。
+class ElidedPaginationTests(TestCase):
+    # 省略表示が必要になる11ページ分の記事を用意する。
+    @classmethod
+    def setUpTestData(cls):
+        Kijis.objects.bulk_create(
+            [Kijis(title=f'ページ番号確認 {number}') for number in range(101)]
+        )
+
+    # 先頭ページでは、先頭・末尾の番号と省略記号を表示する。
+    def test_first_page_uses_django_elided_page_range(self):
+        response = self.client.get(
+            reverse('list:ShowList2'),
+            {'pages': '10', 'order': '0'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [str(number) for number in response.context['elided_page_range']],
+            ['1', '2', '3', '4', '…', '10', '11'],
+        )
+        self.assertContains(
+            response,
+            'aria-hidden="true">…</span>',
+        )
+        self.assertContains(response, 'page=11')
+
+
 # 記事を主運用するadminの追加・著者・破棄操作を確認する。
 class ArticleAdminTests(TestCase):
     # 記事入力に必要な発行管理と関連データを用意する。
@@ -863,7 +906,14 @@ class ArticleAdminTests(TestCase):
             no=2,
             start_page=113,
         )
-        cls.category = Category.objects.create(name='解説')
+        cls.category_group = CategoryGroup.objects.create(
+            name='記事登録用原稿種別',
+            display_order=90,
+        )
+        cls.category = Category.objects.create(
+            name='解説',
+            group=cls.category_group,
+        )
         cls.bunrui = Bunrui.objects.create(name='気候')
         cls.first_author = Author.objects.create(name='著者A')
         cls.keyword = Keyword.objects.create(name='気候変動')
@@ -916,7 +966,7 @@ class ArticleAdminTests(TestCase):
         )
         return article, relation
 
-    # 記事追加画面には巻・号選択と、未保存入力を破棄する導線を表示する。
+    # 記事追加画面には巻・号選択と、未保存入力を破棄する共通導線を表示する。
     def test_add_form_shows_publication_author_and_discard_controls(self):
         response = self.client.get(reverse('admin:list_kijis_add'))
 
@@ -925,21 +975,63 @@ class ArticleAdminTests(TestCase):
         self.assertContains(response, 'id="id_no"')
         self.assertContains(response, '著者（公開表示順）')
         self.assertContains(response, 'id="id_author_links-0-author"')
-        self.assertContains(response, '入力を破棄して記事一覧へ戻る', count=2)
-        self.assertContains(response, 'data-discard-article', count=2)
+        self.assertContains(response, '入力を破棄して元の画面に戻る', count=2)
+        self.assertContains(response, 'data-discard-form', count=2)
         self.assertContains(response, 'list/js/article_admin.js')
+
+    # 記事入力では、参照アイコンと削除不可な関連データの✖を出さない。
+    def test_article_form_hides_view_and_protected_delete_icons(self):
+        article, _relation = self.create_article_with_author()
+        responses = (
+            self.client.get(reverse('admin:list_kijis_add')),
+            self.client.get(
+                reverse('admin:list_kijis_change', args=(article.pk,))
+            ),
+        )
+
+        for response in responses:
+            with self.subTest(url=response.request['PATH_INFO']):
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(
+                    response,
+                    'related-widget-wrapper-link view-related',
+                )
+                self.assertNotContains(response, 'icon-viewlink.svg')
+                self.assertNotContains(response, 'id="delete_id_category"')
+                self.assertNotContains(
+                    response,
+                    'id="delete_id_author_links-0-author"',
+                )
+                self.assertNotContains(
+                    response,
+                    'related-widget-wrapper-link delete-related',
+                )
+
+        self.assertIn(
+            'data-allow-clear="false"',
+            str(responses[0].context['adminform'].form['category']),
+        )
 
     # 号の操作リンクから渡す巻・号を初期値として表示できる。
     def test_add_form_accepts_initial_publication_from_query_parameters(self):
         response = self.client.get(
             reverse('admin:list_kijis_add'),
-            {'volume': self.year.volume, 'no': self.issue_two.no},
+            {
+                'volume': self.year.volume,
+                'no': self.issue_two.no,
+                'from_year': self.year.pk,
+            },
         )
 
         self.assertEqual(response.status_code, 200)
         form = response.context['adminform'].form
         self.assertEqual(form['volume'].value(), str(self.year.volume))
         self.assertEqual(form['no'].value(), str(self.issue_two.no))
+        self.assertContains(
+            response,
+            reverse('admin:search_year_change', args=(self.year.pk,)),
+            count=2,
+        )
 
     # 記事追加時に指定した著者表示順を公開画面でも使う。
     def test_add_article_saves_and_publishes_specified_author_order(self):
@@ -1069,8 +1161,8 @@ class ArticleAdminTests(TestCase):
         )
         self.assertContains(response, '使用中')
 
-    # 破棄リンクは新規追加画面だけに表示し、既存記事の編集画面には出さない。
-    def test_discard_link_is_only_shown_while_adding_article(self):
+    # 破棄リンクは追加・変更の両方で、未保存入力を安全に破棄できる。
+    def test_discard_link_is_shown_while_adding_and_changing_article(self):
         article, _relation = self.create_article_with_author()
 
         add_response = self.client.get(reverse('admin:list_kijis_add'))
@@ -1078,5 +1170,181 @@ class ArticleAdminTests(TestCase):
             reverse('admin:list_kijis_change', args=(article.pk,))
         )
 
-        self.assertContains(add_response, '入力を破棄して記事一覧へ戻る')
-        self.assertNotContains(change_response, '入力を破棄して記事一覧へ戻る')
+        self.assertContains(add_response, '入力を破棄して元の画面に戻る')
+        self.assertContains(change_response, '入力を破棄して元の画面に戻る')
+        self.assertContains(
+            change_response,
+            reverse('admin:list_kijis_changelist'),
+        )
+
+
+# 記事に使うカテゴリ・内容分類・キーワードをadminで安全に管理できることを確認する。
+class ArticleReferenceAdminTests(TestCase):
+    # 使用中・未使用の各マスタと、原稿種別を用意する。
+    @classmethod
+    def setUpTestData(cls):
+        cls.category_group = CategoryGroup.objects.create(
+            name='管理テスト用原稿種別',
+            display_order=100,
+        )
+        cls.unused_category_group = CategoryGroup.objects.create(
+            name='未使用の原稿種別',
+            display_order=101,
+        )
+        cls.used_category = Category.objects.create(
+            name='使用中カテゴリ',
+            group=cls.category_group,
+        )
+        cls.unused_category = Category.objects.create(
+            name='未使用カテゴリ',
+            group=cls.category_group,
+        )
+        cls.used_bunrui = Bunrui.objects.create(name='使用中内容分類')
+        cls.unused_bunrui = Bunrui.objects.create(name='未使用内容分類')
+        cls.used_keyword = Keyword.objects.create(name='使用中キーワード')
+        cls.unused_keyword = Keyword.objects.create(name='未使用キーワード')
+        cls.article = Kijis.objects.create(
+            title='マスタ使用確認の記事',
+            category=cls.used_category,
+        )
+        cls.article.bunrui.add(cls.used_bunrui)
+        cls.article.keyword.add(cls.used_keyword)
+        cls.admin_user = get_user_model().objects.create_superuser(
+            username='reference-admin',
+            password='test-password',
+        )
+
+    # 各テストを全権限の管理者として実行する。
+    def setUp(self):
+        self.client.force_login(self.admin_user)
+
+    # ホームとカテゴリ追加画面に、マスタ管理と原稿種別指定を表示する。
+    def test_home_and_category_form_show_reference_management(self):
+        home_response = self.client.get(reverse('admin:index'))
+        category_response = self.client.get(reverse('admin:list_category_add'))
+
+        self.assertEqual(home_response.status_code, 200)
+        for label in ('カテゴリ', '内容分類', 'キーワード', '原稿種別'):
+            self.assertContains(home_response, label)
+        self.assertEqual(category_response.status_code, 200)
+        self.assertContains(category_response, 'id="id_group"')
+        self.assertContains(category_response, '原稿種別')
+
+    # 使用中の原稿種別を削除しようとして403になる✖は、カテゴリフォームに出さない。
+    def test_category_form_hides_protected_group_delete_icon(self):
+        responses = (
+            self.client.get(reverse('admin:list_category_add')),
+            self.client.get(
+                reverse(
+                    'admin:list_category_change',
+                    args=(self.used_category.pk,),
+                )
+            ),
+        )
+
+        for response in responses:
+            with self.subTest(url=response.request['PATH_INFO']):
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(response, 'id="delete_id_group"')
+                self.assertNotContains(
+                    response,
+                    'related-widget-wrapper-link delete-related',
+                )
+
+    # 共通の破棄リンクが、記事管理と標準adminの追加・変更画面に表示される。
+    def test_all_admin_forms_show_the_common_discard_link(self):
+        admin_user_change_url = reverse(
+            'admin:auth_user_change',
+            args=(self.admin_user.pk,),
+        )
+        form_urls = (
+            reverse('admin:list_category_add'),
+            reverse('admin:list_category_change', args=(self.used_category.pk,)),
+            reverse('admin:auth_user_add'),
+            admin_user_change_url,
+        )
+
+        for form_url in form_urls:
+            with self.subTest(form_url=form_url):
+                response = self.client.get(form_url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, '入力を破棄して元の画面に戻る')
+                self.assertContains(response, 'data-discard-form')
+                self.assertContains(response, '/static/list/js/admin_discard.js')
+                self.assertNotContains(response, 'related-widget-wrapper-link view-related')
+                self.assertNotContains(response, 'icon-viewlink.svg')
+
+    # 管理ホームとカテゴリ一覧では、目アイコンによる閲覧・件数表示を出さない。
+    def test_admin_home_and_category_changelist_hide_view_icons(self):
+        home_response = self.client.get(reverse('admin:index'))
+        category_response = self.client.get(
+            reverse('admin:list_category_changelist')
+        )
+
+        for response in (home_response, category_response):
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, 'class="viewlink"')
+            self.assertNotContains(response, 'icon-viewlink.svg')
+
+    # 使用中のマスタは削除できず、未使用のものだけを削除できる。
+    def test_reference_master_deletion_is_limited_to_unused_records(self):
+        reference_cases = (
+            (
+                Category,
+                self.used_category,
+                self.unused_category,
+                'category',
+            ),
+            (
+                Bunrui,
+                self.used_bunrui,
+                self.unused_bunrui,
+                'bunrui',
+            ),
+            (
+                Keyword,
+                self.used_keyword,
+                self.unused_keyword,
+                'keyword',
+            ),
+            (
+                CategoryGroup,
+                self.category_group,
+                self.unused_category_group,
+                'categorygroup',
+            ),
+        )
+
+        for model, used_record, unused_record, route_name in reference_cases:
+            with self.subTest(model=model.__name__):
+                used_delete_url = reverse(
+                    f'admin:list_{route_name}_delete',
+                    args=(used_record.pk,),
+                )
+                unused_delete_url = reverse(
+                    f'admin:list_{route_name}_delete',
+                    args=(unused_record.pk,),
+                )
+                changelist_response = self.client.get(
+                    reverse(f'admin:list_{route_name}_changelist')
+                )
+                count_label = (
+                    'カテゴリ数'
+                    if model is CategoryGroup
+                    else '使用中の記事数'
+                )
+                self.assertContains(changelist_response, count_label)
+                self.assertEqual(
+                    self.client.get(used_delete_url).status_code,
+                    403,
+                )
+                self.assertEqual(
+                    self.client.get(unused_delete_url).status_code,
+                    200,
+                )
+
+                response = self.client.post(unused_delete_url, {'post': 'yes'})
+
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(model.objects.filter(pk=used_record.pk).exists())
+                self.assertFalse(model.objects.filter(pk=unused_record.pk).exists())

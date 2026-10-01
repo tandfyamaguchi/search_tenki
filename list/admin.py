@@ -394,58 +394,13 @@ class BunruiAdmin(ArticleReferenceAdmin):
 
 # 未使用の著者名を確認・削除できる管理画面を登録する。
 @admin.register(Author)
-class AuthorAdmin(admin.ModelAdmin):
-    search_fields = ('name',)
-    ordering = ('name',)
-    list_display = ('name', 'used_article_count', 'delete_link')
+class AuthorAdmin(ArticleReferenceAdmin):
+    article_relation_name = 'article_author_links'
     list_display_links = None
-
-    # 削除権限がない利用者には、実行できない削除リンクを表示しない。
-    def get_list_display(self, request):
-        if self.has_delete_permission(request):
-            return self.list_display
-        return ('name', 'used_article_count')
-
-    # 使用中の記事数をまとめて取得し、一覧ごとの追加検索を防ぐ。
-    def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
-            admin_article_count=Count('article_author_links')
-        )
-
-    # 著者名が使用中かを管理画面で分かるようにする。
-    @admin.display(description='使用中の記事数', ordering='admin_article_count')
-    def used_article_count(self, obj):
-        article_count = getattr(obj, 'admin_article_count', None)
-        if article_count is None:
-            article_count = obj.article_author_links.count()
-        return article_count
-
-    # 未使用の著者だけに、削除確認画面へのリンクを表示する。
-    @admin.display(description='操作')
-    def delete_link(self, obj):
-        article_count = getattr(obj, 'admin_article_count', None)
-        if article_count is None:
-            article_count = obj.article_author_links.count()
-        if article_count:
-            return '使用中'
-        delete_url = reverse('admin:list_author_delete', args=(obj.pk,))
-        return format_html('<a href="{}">削除</a>', delete_url)
 
     # 既存の著者名は表記揺れを避けるため編集せず、削除・追加だけを扱う。
     def has_change_permission(self, request, obj=None):
         return False
-
-    # 使用中の著者名は、記事表示を失わせないよう削除させない。
-    def has_delete_permission(self, request, obj=None):
-        if not super().has_delete_permission(request, obj):
-            return False
-        return obj is None or not obj.article_author_links.exists()
-
-    # 複数選択の一括削除では使用中の著者を混ぜる事故を防ぐ。
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        actions.pop('delete_selected', None)
-        return actions
 
 
 # キーワードを名称と使用中の記事数で管理する。
@@ -547,9 +502,13 @@ class KijisAdmin(admin.ModelAdmin):
     readonly_fields = ('article_id',)
 
     # 記事一覧で題名が空の旧データも区別して表示する。
-    @admin.display(description='題名', ordering='title')
+    @admin.display(
+        description='題名',
+        ordering='title',
+        empty_value='（題名なし）',
+    )
     def article_title(self, obj):
-        return obj.title or '（題名なし）'
+        return obj.title
 
     # 巻・号を1列にまとめて表示する。
     @admin.display(description='掲載巻・号')
@@ -559,19 +518,31 @@ class KijisAdmin(admin.ModelAdmin):
         return f'第{obj.volume}巻 {obj.no}号'
 
     # 記事の開始頁を日本語の見出しで表示する。
-    @admin.display(description='記事の開始頁', ordering='startpage')
+    @admin.display(
+        description='記事の開始頁',
+        ordering='startpage',
+        empty_value='未設定',
+    )
     def article_start_page(self, obj):
-        return obj.startpage if obj.startpage is not None else '未設定'
+        return obj.startpage
 
     # カテゴリ未設定の記事も一覧で判別できるようにする。
-    @admin.display(description='カテゴリ', ordering='category__name')
+    @admin.display(
+        description='カテゴリ',
+        ordering='category__name',
+        empty_value='未設定',
+    )
     def article_category(self, obj):
-        return obj.category or '未設定'
+        return obj.category
 
     # PDF未設定の記事も一覧で判別できるようにする。
-    @admin.display(description='PDFファイル名', ordering='pdf')
+    @admin.display(
+        description='PDFファイル名',
+        ordering='pdf',
+        empty_value='未設定',
+    )
     def pdf_filename(self, obj):
-        return obj.pdf or '未設定'
+        return obj.pdf
 
     # 変更画面で記事IDを確認できるようにする。
     @admin.display(description='記事ID')

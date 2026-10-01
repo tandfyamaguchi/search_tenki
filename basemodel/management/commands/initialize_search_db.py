@@ -1,4 +1,5 @@
 import csv
+from collections import Counter
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -6,6 +7,12 @@ from django.db import OperationalError, connections, transaction
 from django.db.migrations.executor import MigrationExecutor
 
 from basemodel.models import Kiji, Naiyou
+from basemodel.services.common import (
+    BATCH_SIZE,
+    SOURCE_DATABASE,
+    TARGET_DATABASE,
+    format_limited_values,
+)
 from basemodel.services.legacy_sync import LegacySynchronizer
 from list.models import (
     ArticleAuthor,
@@ -19,9 +26,6 @@ from list.models import (
 from search.models import Month, Year
 
 
-SOURCE_DATABASE = 'etenki'
-TARGET_DATABASE = 'default'
-BATCH_SIZE = 500
 INITIAL_DATA_DIRECTORY = Path(__file__).resolve().parents[2] / 'initial_data'
 
 
@@ -98,7 +102,7 @@ class Command(BaseCommand):
         if unknown_group_keys:
             raise CommandError(
                 'categories.csvが未定義の原稿種別キーを参照しています: '
-                f'{self._format_values(unknown_group_keys)}'
+                f'{format_limited_values(unknown_group_keys)}'
             )
 
         year_ids = {year_id for year_id, _year, _volume in year_rows}
@@ -110,7 +114,7 @@ class Command(BaseCommand):
         if missing_year_ids:
             raise CommandError(
                 'months.csvが参照する巻IDがyears.csvにありません: '
-                f'{self._format_values(missing_year_ids)}'
+                f'{format_limited_values(missing_year_ids)}'
             )
 
         return {
@@ -352,7 +356,7 @@ class Command(BaseCommand):
         if missing_category_names:
             raise CommandError(
                 'etenki.dbにあるカテゴリがcategories.csvへ未登録です: '
-                f'{self._format_values(missing_category_names)}'
+                f'{format_limited_values(missing_category_names)}'
             )
 
         return {
@@ -374,7 +378,7 @@ class Command(BaseCommand):
             ]
             raise CommandError(
                 '初期投入の前に、defaultへmigrationを最後まで適用してください: '
-                f'{self._format_values(pending_migrations)}'
+                f'{format_limited_values(pending_migrations)}'
             )
 
     # migrationで作成される原稿種別が、初期データと一致するか確認する。
@@ -398,8 +402,8 @@ class Command(BaseCommand):
             unexpected_names = sorted(actual_group_names - expected_group_names)
             raise CommandError(
                 '原稿種別の初期状態が一致しません。'
-                f'不足: {self._format_values(missing_names)}; '
-                f'想定外: {self._format_values(unexpected_names)}'
+                f'不足: {format_limited_values(missing_names)}; '
+                f'想定外: {format_limited_values(unexpected_names)}'
             )
 
         groups_by_key = {}
@@ -434,7 +438,7 @@ class Command(BaseCommand):
         if occupied_labels:
             raise CommandError(
                 '初回投入の対象に既存データがあります。空のdb.sqlite3を用意してください: '
-                f'{self._format_values(occupied_labels)}'
+                f'{format_limited_values(occupied_labels)}'
             )
 
     # CSVと旧DBから、IDを維持した初期レコードを作成する。
@@ -491,7 +495,7 @@ class Command(BaseCommand):
 
     # 初期投入件数と同期結果を表示用の文章へ整形する。
     def _format_summary(self, seed_counts, synchronization_statistics):
-        synchronization_summary = LegacySynchronizer().format_summary(
+        synchronization_summary = LegacySynchronizer.format_summary(
             synchronization_statistics,
         )
         return (
@@ -505,20 +509,15 @@ class Command(BaseCommand):
     # 重複値があれば、初期データの不整合として中断する。
     def _validate_unique_values(self, values, label):
         duplicate_values = sorted(
-            {value for value in values if values.count(value) > 1},
+            (
+                value
+                for value, count in Counter(values).items()
+                if count > 1
+            ),
             key=str,
         )
         if duplicate_values:
             raise CommandError(
-                f'{label}が重複しています: {self._format_values(duplicate_values)}'
+                f'{label}が重複しています: '
+                f'{format_limited_values(duplicate_values)}'
             )
-
-    # エラー表示用に値の一覧を短縮する。
-    def _format_values(self, values):
-        if not values:
-            return 'なし'
-        displayed_values = ', '.join(str(value) for value in values[:20])
-        remaining_count = len(values) - 20
-        if remaining_count > 0:
-            return f'{displayed_values} ほか{remaining_count}件'
-        return displayed_values

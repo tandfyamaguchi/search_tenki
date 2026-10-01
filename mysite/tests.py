@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.test import SimpleTestCase
 
+from basemodel.models import Kiji
+
 from .db_router import DBRouter
 from . import settings as project_settings
 
@@ -20,6 +22,10 @@ class DBRouterMigrationTests(SimpleTestCase):
     def test_basemodel_cannot_migrate_on_any_database(self):
         self.assertIs(self.router.allow_migrate('default', 'basemodel'), False)
         self.assertIs(self.router.allow_migrate('etenki', 'basemodel'), False)
+
+    # 旧DBモデルの書込み先も、読み取り専用の旧DBであることを確認する。
+    def test_basemodel_writes_use_legacy_database(self):
+        self.assertEqual(self.router.db_for_write(Kiji), 'etenki')
 
 
 # 旧DBが接続設定でも書込み不能であることを確認する。

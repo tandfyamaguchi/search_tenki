@@ -1,15 +1,7 @@
-#urlのGETを引き継ぐ
+# 検索結果一覧で使う並び替えURLを生成する。
 from django import template
 
 register = template.Library()
-
-# GET条件を保ったまま、指定した項目だけを置き換える。
-@register.simple_tag
-def url_replace(request, field, value):
-    dict_ = request.GET.copy()
-    dict_[field] = value
-    return dict_.urlencode()
-
 
 # 検索条件を保ち、指定した並び替えグループのURLを作る。
 @register.simple_tag

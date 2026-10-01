@@ -1,13 +1,16 @@
+from collections import Counter
+
 from django.core.management.base import CommandError
 
 from ..models import Kiji, Naiyou
 from list.models import Author, Bunrui, Category, Kijis, Keyword
-
-
-SOURCE_DATABASE = 'etenki'
-TARGET_DATABASE = 'default'
-BATCH_SIZE = 500
-MAX_VALIDATION_ERRORS = 20
+from .common import (
+    BATCH_SIZE,
+    MAX_DISPLAY_VALUES,
+    SOURCE_DATABASE,
+    TARGET_DATABASE,
+    format_limited_values,
+)
 
 
 # 旧DBの記事を検索用DBへ同期する処理をまとめる。
@@ -36,12 +39,10 @@ class LegacySynchronizer:
                 'pdf',
             )
         )
-        source_articles_by_id = {
-            article['id']: article for article in source_articles
-        }
+        source_article_ids = {article['id'] for article in source_articles}
         target_articles_by_id = Kijis.objects.using(TARGET_DATABASE).in_bulk()
         self._validate_article_ids(
-            set(source_articles_by_id),
+            source_article_ids,
             set(target_articles_by_id),
         )
 
@@ -102,21 +103,9 @@ class LegacySynchronizer:
         if source_only or target_only:
             raise CommandError(
                 f'{label}が一致しません。'
-                f'旧DBのみ: {self._format_values(source_only)}; '
-                f'検索用DBのみ: {self._format_values(target_only)}'
+                f'旧DBのみ: {format_limited_values(source_only)}; '
+                f'検索用DBのみ: {format_limited_values(target_only)}'
             )
-
-    # エラー表示用に値の一覧を短縮する。
-    def _format_values(self, values):
-        if not values:
-            return 'なし'
-        displayed_values = ', '.join(
-            str(value) for value in values[:MAX_VALIDATION_ERRORS]
-        )
-        remaining_count = len(values) - MAX_VALIDATION_ERRORS
-        if remaining_count > 0:
-            return f'{displayed_values} ほか{remaining_count}件'
-        return displayed_values
 
     # 対象モデルの名称が一意であることを確認して辞書にまとめる。
     def _build_name_lookup(self, model, label):
@@ -131,7 +120,7 @@ class LegacySynchronizer:
         if duplicate_names:
             raise CommandError(
                 f'{label}名が重複しています: '
-                f'{self._format_values(sorted(set(duplicate_names)))}'
+                f'{format_limited_values(sorted(set(duplicate_names)))}'
             )
         return objects_by_name
 
@@ -144,7 +133,7 @@ class LegacySynchronizer:
         raise CommandError(
             '旧DBにあるカテゴリが検索用DBへ未登録です。'
             '初回同期の前に、承認済みベースDBへ原稿種別付きで登録してください: '
-            f'{self._format_values(missing_names)}'
+            f'{format_limited_values(missing_names)}'
         )
 
     # 旧DBの記事から、同期後に必要となる関連データを検証して作成する。
@@ -251,7 +240,9 @@ class LegacySynchronizer:
                 )
 
         duplicate_values = {
-            value for value in values if values.count(value) > 1 and value.strip()
+            value
+            for value, count in Counter(values).items()
+            if count > 1 and value.strip()
         }
         if duplicate_values:
             errors.append(
@@ -271,22 +262,21 @@ class LegacySynchronizer:
         if not validation_errors:
             return
 
-        displayed_errors = validation_errors[:MAX_VALIDATION_ERRORS]
+        displayed_errors = validation_errors[:MAX_DISPLAY_VALUES]
         message = '\n'.join(displayed_errors)
-        remaining_count = len(validation_errors) - MAX_VALIDATION_ERRORS
+        remaining_count = len(validation_errors) - MAX_DISPLAY_VALUES
         if remaining_count > 0:
             message += f'\nほか{remaining_count}件の検証エラーがあります。'
         raise CommandError(f'旧DBのデータを検証できません。\n{message}')
 
     # 準備済みのデータを使い、記事本体と関連データを差分同期する。
     def _synchronize(self, prepared_data):
+        # カテゴリは原稿種別を持つ承認済みベースDBからだけ参照する。
         statistics = {
             'categories_created': 0,
             'authors_created': 0,
             'keywords_created': 0,
         }
-        # カテゴリは原稿種別を持つ承認済みベースDBからだけ参照する。
-        statistics['categories_created'] = 0
         statistics['articles_updated'] = self._synchronize_articles(prepared_data)
         statistics['bunrui_updated'] = self._synchronize_bunrui_names(prepared_data)
         statistics['authors_created'] = self._ensure_named_records(
@@ -514,7 +504,8 @@ class LegacySynchronizer:
             yield values[start:start + BATCH_SIZE]
 
     # 同期結果を作成・更新・削除件数として整形する。
-    def format_summary(self, statistics):
+    @staticmethod
+    def format_summary(statistics):
         return (
             f"記事更新: {statistics['articles_updated']}件、"
             f"内容分類名更新: {statistics['bunrui_updated']}件、"

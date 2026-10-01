@@ -1,4 +1,4 @@
-#検索画面SearchDetail.htmlのフォームを設定
+# SearchDetail.htmlで使う検索フォームを定義する。
 from typing import NamedTuple
 
 from django import forms
@@ -6,8 +6,9 @@ from django.core.exceptions import ValidationError
 from django.db.models import Case, IntegerField, Value, When
 
 from .category_groups import build_category_groups
-from .models import Year, Month
 from list.models import Bunrui, Category
+
+from .models import Month, Year
 
 # 参照サイトと同じ、内容分類の階層順を定義する。
 BUNRUI_DISPLAY_ORDER = (
@@ -97,9 +98,9 @@ CATEGORY_CHOICES = Category.objects.select_related('group').order_by(
     'group__display_order',
     'id',
 )
-VOLUME_CHOICES = Year.objects.all().order_by('id').reverse()
-ORDER_CHOICES = ((0, "降順"),(1, "昇順"))
-PAGES_CHOICES = ((10,10),(30,30),(50,50),(100,100))
+VOLUME_CHOICES = Year.objects.order_by('-id')
+ORDER_CHOICES = ((0, '降順'), (1, '昇順'))
+PAGES_CHOICES = ((10, 10), (30, 30), (50, 50), (100, 100))
 
 
 # 検索式を、ORごとの必須語群と除外語に分けて保持する。
@@ -204,10 +205,19 @@ class ClearableTypedMultipleChoiceField(forms.TypedMultipleChoiceField):
 
 # 詳細検索画面の入力フォームを定義する。
 class SearchDetailForm(forms.Form):
-    bun = BunruiChoiceField(label='内容分類', widget=forms.Select, queryset=BUNRUI_CHOICES, required=False,)
-    categ = forms.ModelMultipleChoiceField(label='カテゴリ', widget=forms.CheckboxSelectMultiple, queryset=CATEGORY_CHOICES, required=False,)
-    title = forms.CharField(label='タイトル', widget=forms.TextInput(), max_length=20, required=False,)
-    author = forms.CharField(label='著者', widget=forms.TextInput(), max_length=20, required=False,)
+    bun = BunruiChoiceField(
+        label='内容分類',
+        queryset=BUNRUI_CHOICES,
+        required=False,
+    )
+    categ = forms.ModelMultipleChoiceField(
+        label='カテゴリ',
+        widget=forms.CheckboxSelectMultiple,
+        queryset=CATEGORY_CHOICES,
+        required=False,
+    )
+    title = forms.CharField(label='タイトル', max_length=20, required=False)
+    author = forms.CharField(label='著者', max_length=20, required=False)
     vol = ClearableModelMultipleChoiceField(
         label='巻',
         widget=forms.CheckboxSelectMultiple(
@@ -227,9 +237,20 @@ class SearchDetailForm(forms.Form):
         coerce=int,
         required=False,
     )
-    word = forms.CharField(label='キーワード', widget=forms.TextInput(), max_length=20, required=False,)
-    order = forms.ChoiceField(label='巻の並び順', widget=forms.Select, choices = ORDER_CHOICES, required=False,initial=0)
-    pages = forms.TypedChoiceField(label='ページあたり表示件数', widget=forms.Select, choices = PAGES_CHOICES, coerce=int, required=False, initial=30)
+    word = forms.CharField(label='キーワード', max_length=20, required=False)
+    order = forms.ChoiceField(
+        label='巻の並び順',
+        choices=ORDER_CHOICES,
+        required=False,
+        initial=0,
+    )
+    pages = forms.TypedChoiceField(
+        label='ページあたり表示件数',
+        choices=PAGES_CHOICES,
+        coerce=int,
+        required=False,
+        initial=30,
+    )
 
     # フォーム生成時に、全巻の号選択肢を設定する。
     def __init__(self, *args, **kwargs):

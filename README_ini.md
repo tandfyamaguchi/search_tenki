@@ -17,6 +17,7 @@
 
 `list.0006_category_group_admin` は初回の原稿種別25件を作成します。続く`initialize_search_db`が、`category_groups.csv`の原稿種別名・表示順を検証し、`categories.csv`にあるカテゴリID 1〜206へ原稿種別キーに対応する所属を付けて投入します。`list.0007_require_category_group`により、カテゴリは原稿種別なしで保存できません。初期投入中にエラーが出た場合は本番DBを手作業で変更せず、空のステージングDBと`basemodel/initial_data/`内のCSV、`etenki.db`を確認してください。
 
+
 ## 2. 環境構築
 
 以下のテスト環境と同じ構成を作る手順です。

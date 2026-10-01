@@ -2,8 +2,9 @@ from django.db import models
 
 # 巻と発行年を管理する。
 class Year(models.Model):
-    year = models.SmallIntegerField()
-    volume = models.SmallIntegerField()
+    # 年・巻番号では負数を受け付けない。
+    year = models.PositiveSmallIntegerField()
+    volume = models.PositiveSmallIntegerField()
 
     # 検索フォームの既存表示形式として巻番号を返す。
     def __str__(self):
@@ -25,8 +26,9 @@ class Year(models.Model):
 # 巻に属する号と開始頁を管理する。
 class Month(models.Model):
     volume = models.ForeignKey(Year, on_delete=models.PROTECT)
-    no = models.SmallIntegerField()
-    start_page = models.SmallIntegerField()
+    # 号番号と開始頁では負数を受け付けない。
+    no = models.PositiveSmallIntegerField()
+    start_page = models.PositiveSmallIntegerField()
 
     # 検索フォームの既存表示形式として号番号を返す。
     def __str__(self):

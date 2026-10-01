@@ -1,14 +1,62 @@
-20200111　改良(山口)
-	・レイアウトの変更
-	・pdf表示のリンクを貼る
-	・著者名に「他」が入っていると、リンクを貼らない
-	・「特別号」のリンクを貼る
-	・ヘッダーの画像の設置
-	・faviconの設定
-20231225
-	・レイアウトの変更
-	・「詳細検索」時に「巻の並び順」「ページあたり表示件数」「リセット」を設定できるようにした
-ーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーー
+# 「天気」記事検索 — プログラム概要
+
+導入手順は [README_ini.md](README_ini.md)、Django admin を使う日常運用は [README.md](README.md) を参照してください。
+
+## 構成
+
+|場所|役割|
+|---|---|
+|`mysite/`|Django設定、URL設定、DBルーター|
+|`home/`|トップ画面|
+|`search/`|巻・号検索、詳細検索、検索フォーム、巻・号の管理|
+|`list/`|検索結果、記事・カテゴリ・著者・キーワードの管理|
+|`basemodel/`|旧DBの参照モデルと初回同期コマンド|
+|`static/`|`collectstatic` の出力先。直接編集しない|
+
+各アプリ内の `static/` はCSS・JavaScript・画像の元ファイルです。テンプレートでは Django の `{% static %}` タグで参照します。
+
+## 画面とURL
+
+|URL|処理|
+|---|---|
+|`/`|トップ画面|
+|`/search/volume/`|巻の一覧|
+|`/search/no/<year_id>/`|選択した巻の号一覧|
+|`/search/detail/`|詳細検索条件の入力|
+|`/list/list1/<id>/`|選択した号の記事一覧|
+|`/list/list2/`|詳細検索の結果一覧|
+|`/list/list3/<id>/<shurui>/`|内容分類・著者・キーワードから開く記事一覧|
+|`/admin/`|管理画面|
+
+`search/forms.py` が詳細検索条件を検証し、`list/views.py` が検索・並び替え・ページネーションを行います。記事一覧のHTMLは `list/templates/list/page.html` で共通表示します。
+
+## データの扱い
+
+- `default`（`db.sqlite3`）には公開検索と管理画面で使うデータを保存します。
+- `etenki`（`etenki.db`）は初回同期時の旧データ参照元です。通常の接続はSQLiteの読み取り専用で、アプリケーションから変更しません。
+- `mysite/db_router.py` は、`basemodel` を `etenki`、その他を `default` に振り分けます。
+- `initialize_search_db` は空の検索用DBにだけ実行する初回導入コマンドです。`--dry-run` で確認し、承認後に `--apply` を一度だけ実行します。
+
+## 主なモデルと制約
+
+- `search.Year` は発行年と巻番号、`search.Month` は巻に属する号と開始頁を管理します。
+- `list.Kijis` は検索対象の記事、`Category`、`Bunrui`、`Author`、`Keyword` は記事に関連するマスタです。
+- 巻番号は一意で、同じ巻に同じ号番号は登録できません。
+- 年・巻・号・開始頁は負数で保存できません。開始頁の `0` は既存の特別号データとの互換性のため許可します。
+- カテゴリには原稿種別が必須で、カテゴリ名は重複登録できません。
+
+## 確認コマンド
+
+`search-tenki-dj52` 環境を有効化してから、変更時には次を実行します。
+
+```sh
+python manage.py check
+python manage.py test
+python manage.py makemigrations --check --dry-run
+```
+
+本番導入前には、`python manage.py migrate --plan` を確認します。旧DBに対する `migrate`、初回同期後の `initialize_search_db` の再実行、`static/` の直接編集は行いません。
+
 フォルダー構造
 /
 |- manage.py
@@ -68,9 +116,7 @@
   |-legacy_sync.py
  |-management/commands
   |-initialize_search_db.py
- 
-各アプリ配下の static/ は、CSS・JS・画像などの元ファイルです。
-プログラム直下の static/ は、collectstatic が各アプリと Django admin の静的ファイルを一か所へ集約した本番配信用の出力先です。このフォルダー内は編集しません。
+
 #------------
 views,formsの構造
 serch/views.py
@@ -209,3 +255,4 @@ id=1040202508, keyword='大気-陸域相互作用、熱水収支、物質循環�
 
 author_jpが重複しているため、削除
 id=1040204046, '加藤輝之・大関崇・荻本和彦・長澤亮二・大竹秀明・早宣之・伊藤純至・加藤輝之・原旅人'からauthor_jp'加藤輝之・大関崇・荻本和彦・長澤亮二・大竹秀明・早宣之・伊藤純至・原旅人'
+

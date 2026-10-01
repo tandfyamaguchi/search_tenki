@@ -126,6 +126,14 @@ def _register_article_text_collation(database):
     )
 
 
+# DBごとの文字列比較式を、記事一覧の並び替え用に作る。
+def _article_text_order_expression(database, source):
+    if database.vendor == 'sqlite':
+        _register_article_text_collation(database)
+        return Collate(source, ARTICLE_TEXT_COLLATION)
+    return Lower(source)
+
+
 # 空文字をNULLへ変換してから、文字列型の数値列を整数として扱う。
 def numeric_text_expression(field_name):
     return Cast(
@@ -186,12 +194,10 @@ def apply_article_sort(queryset, request):
     database = connections[queryset.db]
 
     if sort_field in TEXT_SORT_FIELDS:
-        source = F(TEXT_SORT_FIELDS[sort_field])
-        if database.vendor == 'sqlite':
-            _register_article_text_collation(database)
-            source = Collate(source, ARTICLE_TEXT_COLLATION)
-        else:
-            source = Lower(source)
+        source = _article_text_order_expression(
+            database,
+            F(TEXT_SORT_FIELDS[sort_field]),
+        )
     else:
         article_author = Kijis.author.through
         first_author_name = (
@@ -201,12 +207,10 @@ def apply_article_sort(queryset, request):
             .order_by('display_order', 'id')
             .values('author__name')[:1]
         )
-        source = Subquery(first_author_name, output_field=CharField())
-        if database.vendor == 'sqlite':
-            _register_article_text_collation(database)
-            source = Collate(source, ARTICLE_TEXT_COLLATION)
-        else:
-            source = Lower(source)
+        source = _article_text_order_expression(
+            database,
+            Subquery(first_author_name, output_field=CharField()),
+        )
     # IDを第2キーにして、ページを移動しても文字列の表示順が揺れないようにする。
     return (
         queryset.order_by(directional_order(source, direction), 'id'),

@@ -1,42 +1,46 @@
-from django.db import models   
+from django.db import models
 
-#Kijisのbunruiで参照（複数記事で同じものが出てくるため）
+
+# 記事の内容分類として再利用する名称を管理する。
 class Bunrui(models.Model):
     name = models.CharField(max_length=100)
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
     # 管理画面で表示する日本語名称を定義する。
     class Meta:
         verbose_name = '内容分類'
         verbose_name_plural = '内容分類'
 
-#Kijisのauthorで参照（複数記事で同じものが出てくるため）
+
+# 記事の著者として再利用する名称を管理する。
 class Author(models.Model):
     # 同名の著者を重複登録しない。
     name = models.CharField(max_length=256, unique=True)
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
     # 管理画面で表示する日本語名称を定義する。
     class Meta:
         verbose_name = '著者'
         verbose_name_plural = '著者'
 
-#Kijisのkeywordで参照（複数記事で同じものが出てくるため）
+
+# 記事のキーワードとして再利用する名称を管理する。
 class Keyword(models.Model):
     # 同名のキーワードを重複登録しない。
     name = models.CharField(max_length=256, unique=True)
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
     # 管理画面で表示する日本語名称を定義する。
     class Meta:
         verbose_name = 'キーワード'
         verbose_name_plural = 'キーワード'
+
 
 # 詳細検索でカテゴリをまとめる原稿種別を管理する。
 class CategoryGroup(models.Model):
@@ -46,7 +50,7 @@ class CategoryGroup(models.Model):
     display_order = models.PositiveSmallIntegerField(unique=True)
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
     # 原稿種別を表示順で扱うための管理情報を定義する。
     class Meta:
@@ -55,31 +59,37 @@ class CategoryGroup(models.Model):
         verbose_name_plural = '原稿種別'
 
 
-# Kijisのcategoryで参照（複数記事で同じものが出てくるため）
+# 記事のカテゴリとして再利用する名称を管理する。
 class Category(models.Model):
-    name = models.CharField(max_length=100)
+    # 同名のカテゴリを重複登録しない。
+    name = models.CharField(max_length=100, unique=True)
     # カテゴリには、詳細検索で使う原稿種別を必ず所属させる。
     group = models.ForeignKey(
         CategoryGroup,
-        blank=False,
-        null=False,
         on_delete=models.PROTECT,
         related_name='categories',
     )
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
     # 管理画面で表示する日本語名称を定義する。
     class Meta:
         verbose_name = 'カテゴリ'
         verbose_name_plural = 'カテゴリ'
 
-#記事のデータベース
+
+# 記事データを管理する。
 class Kijis(models.Model):
     bunrui = models.ManyToManyField(Bunrui, related_name='bunrui', blank=True)
     # 使用中のカテゴリを削除して記事が未分類になることを防ぐ。
-    category = models.ForeignKey(Category, blank=True, null=True, related_name='category', on_delete=models.PROTECT)
+    category = models.ForeignKey(
+        Category,
+        blank=True,
+        null=True,
+        related_name='category',
+        on_delete=models.PROTECT,
+    )
     title = models.CharField(max_length=400, blank=True, null=True)
     # 著者ごとの公開表示順をArticleAuthorで保持する。
     author = models.ManyToManyField(
@@ -90,7 +100,8 @@ class Kijis(models.Model):
         blank=True,
     )
     volume = models.TextField(blank=True, null=True)
-    startpage = models.SmallIntegerField(blank=True, null=True)
+    # 開始頁では負数を受け付けない。
+    startpage = models.PositiveSmallIntegerField(blank=True, null=True)
     no = models.TextField(blank=True, null=True)
     keyword = models.ManyToManyField(Keyword, related_name='keyword', blank=True)
     pdf = models.CharField(max_length=50, blank=True, null=True)

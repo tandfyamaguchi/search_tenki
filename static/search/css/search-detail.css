@@ -1,6 +1,5 @@
-/* カテゴリ・巻・号の選択欄で共通する外枠を整える。 */
-.category-picker,
-.multi-checkbox-picker {
+/* カテゴリ選択欄を、長い候補一覧でも見やすく整える。 */
+.category-picker {
     width: 100%;
     max-width: 48rem;
     margin: 0;
@@ -25,9 +24,7 @@
 }
 
 .category-picker__help,
-.category-picker__status,
-.multi-checkbox-picker__help,
-.multi-checkbox-picker__status {
+.category-picker__status {
     margin-bottom: 0.5rem;
 }
 
@@ -42,8 +39,7 @@
     max-width: 28rem;
 }
 
-.category-picker__controls,
-.multi-checkbox-picker__controls {
+.category-picker__controls {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
@@ -122,13 +118,9 @@
     cursor: pointer;
 }
 
-/* 操作中の選択欄に共通のフォーカス枠を表示する。 */
 .category-picker button:focus,
 .category-picker input:focus,
-.category-picker label:focus-within,
-.multi-checkbox-picker button:focus,
-.multi-checkbox-picker input:focus,
-.multi-checkbox-picker label:focus-within {
+.category-picker label:focus-within {
     outline: 2px solid #0056b3;
     outline-offset: 2px;
 }
@@ -141,6 +133,29 @@
 }
 
 /* 巻・号の候補を、絞り込みなしのチェックボックス一覧として表示する。 */
+.multi-checkbox-picker {
+    width: 100%;
+    max-width: 48rem;
+    margin: 0;
+    padding: 1rem;
+    box-sizing: border-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    background-color: #fff;
+}
+
+.multi-checkbox-picker__help,
+.multi-checkbox-picker__status {
+    margin-bottom: 0.5rem;
+}
+
+.multi-checkbox-picker__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
 .multi-checkbox-picker__options {
     max-height: 18rem;
     padding: 0.5rem;
@@ -171,6 +186,13 @@
     flex: 0 0 auto;
     margin-top: 0.3rem;
     margin-right: 0.45rem;
+}
+
+.multi-checkbox-picker button:focus,
+.multi-checkbox-picker input:focus,
+.multi-checkbox-picker label:focus-within {
+    outline: 2px solid #0056b3;
+    outline-offset: 2px;
 }
 
 /* 詳細検索画面全体を、右側の本文領域内で中央に配置する。 */
@@ -364,8 +386,10 @@
         grid-template-columns: minmax(0, 1fr);
     }
 
-    /* 狭い画面では、2種類の選択欄に同じ余白を適用する。 */
-    .category-picker,
+    .category-picker {
+        padding: 0.75rem;
+    }
+
     .multi-checkbox-picker {
         padding: 0.75rem;
     }
