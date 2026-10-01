@@ -1,13 +1,12 @@
 import csv
-from importlib import import_module
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import OperationalError, connections, transaction
 from django.db.migrations.executor import MigrationExecutor
 
-from basemodel.management.commands.makemodel import Command as SynchronizeCommand
 from basemodel.models import Kiji, Naiyou
+from basemodel.services.legacy_sync import LegacySynchronizer
 from list.models import (
     ArticleAuthor,
     Author,
@@ -23,7 +22,7 @@ from search.models import Month, Year
 SOURCE_DATABASE = 'etenki'
 TARGET_DATABASE = 'default'
 BATCH_SIZE = 500
-DATA_DIRECTORY = Path(__file__).resolve().parents[2]
+INITIAL_DATA_DIRECTORY = Path(__file__).resolve().parents[2] / 'initial_data'
 
 
 # 空の検索用DBを初回データで構成し、旧DBとの同期まで実行する。
@@ -56,18 +55,18 @@ class Command(BaseCommand):
         # 初期投入と同期を一つのトランザクションとして扱う。
         with transaction.atomic(using=TARGET_DATABASE):
             self._validate_migrations()
-            category_groups = self._validate_category_groups(
+            category_groups_by_key = self._validate_category_groups(
                 initial_data['category_group_definitions'],
             )
             self._validate_target_is_empty()
             seed_counts = self._seed_target_data(
                 initial_data,
                 source_data,
-                category_groups,
+                category_groups_by_key,
             )
 
-            # 既存の同期検証と差分同期の処理を共通で使用する。
-            synchronizer = SynchronizeCommand()
+            # 初回投入済みのIDを使って、旧DBの記事と関連データを同期する。
+            synchronizer = LegacySynchronizer()
             synchronization_statistics = synchronizer.synchronize(
                 preserve_legacy_relation_values=True,
             )
@@ -87,19 +86,19 @@ class Command(BaseCommand):
         year_rows = self._load_year_rows()
         month_rows = self._load_month_rows()
 
-        configured_category_ids = {
-            category_id
-            for _group_name, category_ids in category_group_definitions
-            for category_id in category_ids
+        defined_group_keys = {
+            group_key
+            for group_key, _group_name, _display_order
+            in category_group_definitions
         }
-        loaded_category_ids = {category_id for category_id, _name in category_rows}
-        if loaded_category_ids != configured_category_ids:
-            missing_ids = sorted(configured_category_ids - loaded_category_ids)
-            unexpected_ids = sorted(loaded_category_ids - configured_category_ids)
+        referenced_group_keys = {
+            group_key for _category_id, _name, group_key in category_rows
+        }
+        unknown_group_keys = sorted(referenced_group_keys - defined_group_keys)
+        if unknown_group_keys:
             raise CommandError(
-                'category.csvのカテゴリIDが承認済み原稿種別対応と一致しません。'
-                f'不足: {self._format_values(missing_ids)}; '
-                f'想定外: {self._format_values(unexpected_ids)}'
+                'categories.csvが未定義の原稿種別キーを参照しています: '
+                f'{self._format_values(unknown_group_keys)}'
             )
 
         year_ids = {year_id for year_id, _year, _volume in year_rows}
@@ -110,130 +109,169 @@ class Command(BaseCommand):
         missing_year_ids = sorted(referenced_year_ids - year_ids)
         if missing_year_ids:
             raise CommandError(
-                'makemonth.csvが参照する巻IDがmakeyear.csvにありません: '
+                'months.csvが参照する巻IDがyears.csvにありません: '
                 f'{self._format_values(missing_year_ids)}'
             )
 
         return {
             'category_group_definitions': category_group_definitions,
             'category_rows': category_rows,
-            'category_names': {name for _category_id, name in category_rows},
+            'category_names': {
+                name for _category_id, name, _group_key in category_rows
+            },
             'year_rows': year_rows,
             'month_rows': month_rows,
         }
 
-    # 既存migrationに固定されたカテゴリと原稿種別の対応を読み込む。
+    # 原稿種別キー、名称、表示順の初期データを読み込む。
     def _load_category_group_definitions(self):
-        migration_module = import_module('list.migrations.0006_category_group_admin')
-        definitions = migration_module.INITIAL_MANUSCRIPT_TYPE_CATEGORY_GROUPS
-        group_names = []
-        category_ids = []
-        normalized_definitions = []
-
-        for group_name, ids in definitions:
-            normalized_ids = tuple(ids)
-            if not group_name or not normalized_ids:
-                raise CommandError('カテゴリと原稿種別の初期対応が不正です。')
-            group_names.append(group_name)
-            category_ids.extend(normalized_ids)
-            normalized_definitions.append((group_name, normalized_ids))
-
-        self._validate_unique_values(group_names, '原稿種別名')
-        self._validate_unique_values(category_ids, 'カテゴリID')
-        return tuple(normalized_definitions)
-
-    # カテゴリIDと名称の初期データを読み込み、重複を検証する。
-    def _load_category_rows(self):
+        filename = 'category_groups.csv'
         rows = []
-        for line_number, row in self._read_csv_rows('category.csv', 2):
+        for line_number, row in self._read_csv_rows(filename, 3):
+            group_key, group_name, raw_display_order = row
+            if not group_key.strip():
+                raise CommandError(
+                    f'{filename}の{line_number}行目の原稿種別キーが空です。'
+                )
+            if group_key != group_key.strip():
+                raise CommandError(
+                    f'{filename}の{line_number}行目の原稿種別キーの前後に空白があります。'
+                )
+            if not group_name.strip():
+                raise CommandError(
+                    f'{filename}の{line_number}行目の原稿種別名が空です。'
+                )
+            rows.append(
+                (
+                    group_key,
+                    group_name,
+                    self._parse_positive_integer(
+                        raw_display_order,
+                        '表示順',
+                        filename,
+                        line_number,
+                    ),
+                )
+            )
+
+        self._validate_unique_values(
+            [group_key for group_key, _name, _display_order in rows],
+            f'{filename}の原稿種別キー',
+        )
+        self._validate_unique_values(
+            [name for _group_key, name, _display_order in rows],
+            f'{filename}の原稿種別名',
+        )
+        self._validate_unique_values(
+            [display_order for _group_key, _name, display_order in rows],
+            f'{filename}の表示順',
+        )
+        return tuple(rows)
+
+    # カテゴリID、名称、原稿種別キーの初期データを読み込む。
+    def _load_category_rows(self):
+        filename = 'categories.csv'
+        rows = []
+        for line_number, row in self._read_csv_rows(filename, 3):
             category_id = self._parse_positive_integer(
                 row[0],
                 'カテゴリID',
-                'category.csv',
+                filename,
                 line_number,
             )
             category_name = row[1]
+            group_key = row[2]
             if not category_name.strip():
                 raise CommandError(
-                    f'category.csvの{line_number}行目のカテゴリ名が空です。'
+                    f'{filename}の{line_number}行目のカテゴリ名が空です。'
                 )
-            rows.append((category_id, category_name))
+            if not group_key.strip():
+                raise CommandError(
+                    f'{filename}の{line_number}行目の原稿種別キーが空です。'
+                )
+            if group_key != group_key.strip():
+                raise CommandError(
+                    f'{filename}の{line_number}行目の原稿種別キーの前後に空白があります。'
+                )
+            rows.append((category_id, category_name, group_key))
 
         self._validate_unique_values(
-            [category_id for category_id, _name in rows],
-            'category.csvのカテゴリID',
+            [category_id for category_id, _name, _group_key in rows],
+            f'{filename}のカテゴリID',
         )
         self._validate_unique_values(
-            [name for _category_id, name in rows],
-            'category.csvのカテゴリ名',
+            [name for _category_id, name, _group_key in rows],
+            f'{filename}のカテゴリ名',
         )
         return tuple(rows)
 
     # 巻の初期データを読み込み、IDと巻番号の重複を検証する。
     def _load_year_rows(self):
+        filename = 'years.csv'
         rows = []
-        for line_number, row in self._read_csv_rows('makeyear.csv', 3):
+        for line_number, row in self._read_csv_rows(filename, 3):
             rows.append(
                 (
                     self._parse_positive_integer(
-                        row[0], '巻ID', 'makeyear.csv', line_number,
+                        row[0], '巻ID', filename, line_number,
                     ),
                     self._parse_positive_integer(
-                        row[1], '発行年', 'makeyear.csv', line_number,
+                        row[1], '発行年', filename, line_number,
                     ),
                     self._parse_positive_integer(
-                        row[2], '巻番号', 'makeyear.csv', line_number,
+                        row[2], '巻番号', filename, line_number,
                     ),
                 )
             )
 
         self._validate_unique_values(
             [year_id for year_id, _year, _volume in rows],
-            'makeyear.csvの巻ID',
+            f'{filename}の巻ID',
         )
         self._validate_unique_values(
             [volume for _year_id, _year, volume in rows],
-            'makeyear.csvの巻番号',
+            f'{filename}の巻番号',
         )
         return tuple(rows)
 
     # 号の初期データを読み込み、巻と号の組合せを検証する。
     def _load_month_rows(self):
+        filename = 'months.csv'
         rows = []
-        for line_number, row in self._read_csv_rows('makemonth.csv', 4):
+        for line_number, row in self._read_csv_rows(filename, 4):
             rows.append(
                 (
                     self._parse_positive_integer(
-                        row[0], '号ID', 'makemonth.csv', line_number,
+                        row[0], '号ID', filename, line_number,
                     ),
                     self._parse_positive_integer(
-                        row[1], '巻ID', 'makemonth.csv', line_number,
+                        row[1], '巻ID', filename, line_number,
                     ),
                     self._parse_nonnegative_integer(
-                        row[2], '開始頁', 'makemonth.csv', line_number,
+                        row[2], '開始頁', filename, line_number,
                     ),
                     self._parse_positive_integer(
-                        row[3], '号番号', 'makemonth.csv', line_number,
+                        row[3], '号番号', filename, line_number,
                     ),
                 )
             )
 
         self._validate_unique_values(
             [month_id for month_id, _volume_id, _start_page, _number in rows],
-            'makemonth.csvの号ID',
+            f'{filename}の号ID',
         )
         self._validate_unique_values(
             [
                 (volume_id, number)
                 for _month_id, volume_id, _start_page, number in rows
             ],
-            'makemonth.csvの巻・号',
+            f'{filename}の巻・号',
         )
         return tuple(rows)
 
     # CSVをUTF-8として読み込み、列数を検証する。
     def _read_csv_rows(self, filename, expected_column_count):
-        path = DATA_DIRECTORY / filename
+        path = INITIAL_DATA_DIRECTORY / filename
         try:
             with path.open(encoding='utf-8-sig', newline='') as csv_file:
                 rows = list(csv.reader(csv_file))
@@ -313,7 +351,7 @@ class Command(BaseCommand):
         missing_category_names = sorted(source_category_names - available_category_names)
         if missing_category_names:
             raise CommandError(
-                'etenki.dbにあるカテゴリがcategory.csvへ未登録です: '
+                'etenki.dbにあるカテゴリがcategories.csvへ未登録です: '
                 f'{self._format_values(missing_category_names)}'
             )
 
@@ -339,7 +377,7 @@ class Command(BaseCommand):
                 f'{self._format_values(pending_migrations)}'
             )
 
-    # migrationで作成される原稿種別が、承認済み初期対応と一致するか確認する。
+    # migrationで作成される原稿種別が、初期データと一致するか確認する。
     def _validate_category_groups(self, definitions):
         try:
             groups_by_name = {
@@ -351,7 +389,9 @@ class Command(BaseCommand):
                 '初期投入の前に、defaultへmigrationを最後まで適用してください。'
             ) from error
 
-        expected_group_names = {group_name for group_name, _ids in definitions}
+        expected_group_names = {
+            group_name for _group_key, group_name, _display_order in definitions
+        }
         actual_group_names = set(groups_by_name)
         if actual_group_names != expected_group_names:
             missing_names = sorted(expected_group_names - actual_group_names)
@@ -362,12 +402,15 @@ class Command(BaseCommand):
                 f'想定外: {self._format_values(unexpected_names)}'
             )
 
-        for display_order, (group_name, _ids) in enumerate(definitions, start=1):
-            if groups_by_name[group_name].display_order != display_order:
+        groups_by_key = {}
+        for group_key, group_name, display_order in definitions:
+            category_group = groups_by_name[group_name]
+            if category_group.display_order != display_order:
                 raise CommandError(
                     f'原稿種別「{group_name}」の表示順が初期値と一致しません。'
                 )
-        return groups_by_name
+            groups_by_key[group_key] = category_group
+        return groups_by_key
 
     # 初期投入の対象テーブルに既存データがないことを確認する。
     def _validate_target_is_empty(self):
@@ -395,13 +438,7 @@ class Command(BaseCommand):
             )
 
     # CSVと旧DBから、IDを維持した初期レコードを作成する。
-    def _seed_target_data(self, initial_data, source_data, category_groups):
-        category_group_ids = {
-            category_id: category_groups[group_name].id
-            for group_name, category_ids in initial_data['category_group_definitions']
-            for category_id in category_ids
-        }
-
+    def _seed_target_data(self, initial_data, source_data, category_groups_by_key):
         Kijis.objects.using(TARGET_DATABASE).bulk_create(
             [Kijis(id=article_id) for article_id in source_data['article_ids']],
             batch_size=BATCH_SIZE,
@@ -418,9 +455,9 @@ class Command(BaseCommand):
                 Category(
                     id=category_id,
                     name=name,
-                    group_id=category_group_ids[category_id],
+                    group_id=category_groups_by_key[group_key].id,
                 )
-                for category_id, name in initial_data['category_rows']
+                for category_id, name, group_key in initial_data['category_rows']
             ],
             batch_size=BATCH_SIZE,
         )
@@ -454,7 +491,7 @@ class Command(BaseCommand):
 
     # 初期投入件数と同期結果を表示用の文章へ整形する。
     def _format_summary(self, seed_counts, synchronization_statistics):
-        synchronization_summary = SynchronizeCommand()._format_summary(
+        synchronization_summary = LegacySynchronizer().format_summary(
             synchronization_statistics,
         )
         return (

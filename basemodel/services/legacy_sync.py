@@ -1,7 +1,6 @@
-from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.core.management.base import CommandError
 
-from ...models import Kiji, Naiyou
+from ..models import Kiji, Naiyou
 from list.models import Author, Bunrui, Category, Kijis, Keyword
 
 
@@ -11,36 +10,9 @@ BATCH_SIZE = 500
 MAX_VALIDATION_ERRORS = 20
 
 
-# 旧DBの記事を検索用DBへ差分同期するコマンドを定義する。
-class Command(BaseCommand):
-    help = '旧DBの記事本体と関連データを検索用DBへ差分同期する。'
+# 旧DBの記事を検索用DBへ同期する処理をまとめる。
+class LegacySynchronizer:
     preserve_legacy_relation_values = False
-
-    # コマンドライン引数を定義する。
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='DBへの変更をロールバックして、同期処理だけを検証する。',
-        )
-
-    # 指定されたモードで記事データの同期を実行する。
-    def handle(self, *args, **options):
-        if args:
-            raise CommandError('このコマンドは位置引数を受け付けません。')
-
-        dry_run = options.get('dry_run', False)
-        # 検索用DBへの全変更を1つのトランザクションにまとめる。
-        with transaction.atomic(using=TARGET_DATABASE):
-            statistics = self.synchronize()
-            if dry_run:
-                # 検証時は、全処理後に検索用DBへの変更だけを取り消す。
-                transaction.set_rollback(True, using=TARGET_DATABASE)
-
-        summary = self._format_summary(statistics)
-        if dry_run:
-            return f'検証が完了しました。DBへの変更はロールバックしました。{summary}'
-        return f'同期が完了しました。{summary}'
 
     # 初回投入後の検索用DBを、旧DBの内容へ同期する。
     def synchronize(self, preserve_legacy_relation_values=False):
@@ -542,7 +514,7 @@ class Command(BaseCommand):
             yield values[start:start + BATCH_SIZE]
 
     # 同期結果を作成・更新・削除件数として整形する。
-    def _format_summary(self, statistics):
+    def format_summary(self, statistics):
         return (
             f"記事更新: {statistics['articles_updated']}件、"
             f"内容分類名更新: {statistics['bunrui_updated']}件、"

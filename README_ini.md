@@ -10,12 +10,12 @@
 |---|---|---|
 |`db.sqlite3`|検索記事、巻・号、カテゴリ・原稿種別、認証、adminの操作履歴を保持する運用DB|読み書き可|
 |`etenki.db`|旧データの参照元（`kiji`、`naiyou`）|変更禁止の参照用データ|
-|`maketable/`|初回導入専用のCSVと`initialize_search_db`コマンド|初回導入以外では使用しない|
+|`basemodel/initial_data/` と `basemodel/management/commands/initialize_search_db.py`|初回導入専用のCSVとコマンド|初回導入以外では使用しない|
 |`static/`|`collectstatic` が出力する静的ファイル|Webサーバーが配信する|
 
 > **重要:** 初回導入では、テスト用や旧環境の`db.sqlite3`を配置しません。空の`db.sqlite3`へ`migrate`を適用した後、`initialize_search_db`を実行します。このコマンドは、`etenki.db`の記事ID・内容分類IDを保った初期レコード、カテゴリ、巻・号を投入し、そのまま旧DBの内容を同期します。`etenki.db`は読み取り専用で、コマンドは変更しません。
 
-`list.0006_category_group_admin` は初回の原稿種別25件を作成します。続く`initialize_search_db`が、承認済みの`category.csv`にあるカテゴリID 1〜206へ原稿種別を付けて投入します。`list.0007_require_category_group`により、カテゴリは原稿種別なしで保存できません。初期投入中にエラーが出た場合は本番DBを手作業で変更せず、空のステージングDBと`maketable/`内のCSV、`etenki.db`を確認してください。
+`list.0006_category_group_admin` は初回の原稿種別25件を作成します。続く`initialize_search_db`が、`category_groups.csv`の原稿種別名・表示順を検証し、`categories.csv`にあるカテゴリID 1〜206へ原稿種別キーに対応する所属を付けて投入します。`list.0007_require_category_group`により、カテゴリは原稿種別なしで保存できません。初期投入中にエラーが出た場合は本番DBを手作業で変更せず、空のステージングDBと`basemodel/initial_data/`内のCSV、`etenki.db`を確認してください。
 
 ## 2. 環境構築
 
@@ -101,17 +101,17 @@ python manage.py initialize_search_db --apply
 python manage.py collectstatic --noinput
 ```
 
-`migrate --database=etenki` は絶対に実行しないでください。旧DBに本来不要なテーブルを作成するおそれがあります。通常の運用DBは必ず `default`（`db.sqlite3`）です。
+`migrate --database=etenki` は絶対に実行しないでください。DBルーターは旧DBに対するmigration操作を拒否し、旧DB接続もSQLiteの読み取り専用設定です。通常の運用DBは必ず `default`（`db.sqlite3`）です。
 
 `migrate`直後の空DBには、原稿種別25件だけが作成され、カテゴリ・記事・内容分類・巻・号はまだありません。`initialize_search_db`は、すべての`default`マイグレーションが適用済みで、これらの初期投入対象テーブルが空であることを確認してから実行します。既存データがある場合は停止するため、テスト用や運用中のDBを上書きしません。
 
 ### 初回導入専用コマンド
 
-初回のみ使用するCSVとコマンドはすべて`maketable/`にまとめています。`initialize_search_db`は、記事ID・内容分類IDを`etenki.db`と同じ値で作成し、`category.csv`、`makeyear.csv`、`makemonth.csv`からカテゴリ・巻・号を投入した後、既存の同期処理を実行します。CSVは承認済みの固定初期データであり、内容を変更したり同フォルダーの旧シェルスクリプトで再生成したりしません。初期投入と同期は1つのトランザクションなので、失敗時や`--dry-run`時に`db.sqlite3`へ途中データは残りません。
+初回のみ使用するCSVは`basemodel/initial_data/`に、コマンドは`basemodel/management/commands/initialize_search_db.py`にまとめています。`category_groups.csv`は「原稿種別キー、名称、表示順」、`categories.csv`は「カテゴリID、名称、原稿種別キー」、`years.csv`は「巻ID、発行年、巻番号」、`months.csv`は「号ID、巻ID、開始頁、号番号」の順で、いずれもヘッダーなしのUTF-8 CSVです。`initialize_search_db`は、記事ID・内容分類IDを`etenki.db`と同じ値で作成し、これらのCSVからカテゴリ・巻・号を投入した後、内部の同期サービスを実行します。CSVは承認済みの固定初期データであり、内容を変更したり再生成したりしません。初期投入と同期は1つのトランザクションなので、失敗時や`--dry-run`時に`db.sqlite3`へ途中データは残りません。
 
 旧DBにある著者・キーワードの表記は、初回同期時に整形せずそのまま引き継ぎます。旧DBのデータを修正する必要がある場合は、同期完了後にDjango adminで管理します。
 
-`initialize_search_db`は`--dry-run`または`--apply`のどちらかを必ず指定します。`--apply`は空DBに対して一度だけ実行します。初回同期後は、`initialize_search_db`と`makemodel`を再実行してはいけません。以後の記事・巻・号・カテゴリ・内容分類・キーワードの更新はadminで行います。
+`initialize_search_db`は`--dry-run`または`--apply`のどちらかを必ず指定します。`--apply`は空DBに対して一度だけ実行します。初回同期後は、`initialize_search_db`を再実行してはいけません。以後の記事・巻・号・カテゴリ・内容分類・キーワードの更新はadminで行います。
 
 `etenki.db`にだけ存在するカテゴリや、CSV・原稿種別の不整合がある場合、`initialize_search_db`は書き込み前に停止します。CSVや本番DBを手作業で変更せず、原因を確認してから初回導入をやり直してください。
 

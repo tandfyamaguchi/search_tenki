@@ -88,9 +88,8 @@ DEBUG, SECRET_KEY, ALLOWED_HOSTS = load_environment_settings()
 # Application definition
 
 INSTALLED_APPS = [
+    # 旧DBを使う初回データ投入のモデルとコマンドを登録する。
     'basemodel.apps.BasemodelConfig',
-    # 空の検索用DBへ初回データを投入するコマンドを登録する。
-    'maketable.apps.MaketableConfig',
     'list.apps.ListConfig',
     'search.apps.SearchConfig',
     'home.apps.HomeConfig',
@@ -139,6 +138,11 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# 旧DBは接続レベルでも読み取り専用にして、誤った書込みを防ぐ。
+LEGACY_DATABASE_URI = f'{(BASE_DIR / "etenki.db").as_uri()}?mode=ro'
+# テスト時だけは、旧DBを模した書込み可能なインメモリDBを使用する。
+TEST_LEGACY_DATABASE_URI = 'file:memorydb_etenki?mode=memory&cache=shared'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -146,7 +150,13 @@ DATABASES = {
     },
     'etenki': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'etenki.db',
+        'NAME': LEGACY_DATABASE_URI,
+        'OPTIONS': {
+            'uri': True,
+        },
+        'TEST': {
+            'NAME': TEST_LEGACY_DATABASE_URI,
+        },
     },
 }
 DATABASE_ROUTERS = ['mysite.db_router.DBRouter']

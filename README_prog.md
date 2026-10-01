@@ -58,12 +58,16 @@
  |-urls.py
  |-views.py
  |-forms.py
-|-maketable
- |-makeyear.sh
- |-makeyear.csv
- |-makemonth.sh
- |-makemonth.csv
- |-category.csv
+|-basemodel
+ |-initial_data
+  |-category_groups.csv
+  |-categories.csv
+  |-years.csv
+  |-months.csv
+ |-services
+  |-legacy_sync.py
+ |-management/commands
+  |-initialize_search_db.py
  
 各アプリ配下の static/ は、CSS・JS・画像などの元ファイルです。
 プログラム直下の static/ は、collectstatic が各アプリと Django admin の静的ファイルを一か所へ集約した本番配信用の出力先です。このフォルダー内は編集しません。
@@ -161,10 +165,11 @@ databaseの使い分け
 　	db.sqlite3 - basemodel以外
 #--------
 
-現在使用されているDBからdjangoで使用できるようにSQLに変換するプログラム（一度変換すれば、その後は利用なし）
- basemodel/management/commands/makemodel.py
+空の検索用DBへ初期データを投入し、旧DBの内容を同期するプログラム（一度実行すれば、その後は利用なし）
+ basemodel/management/commands/initialize_search_db.py
+ basemodel/services/legacy_sync.py
 　etenki.dbは「天気」のデータベース
-　etenki.dbからdb.sqlite3に使いやすいように変形して、挿入
+　etenki.dbからdb.sqlite3に使いやすいように変形して、初回投入時に挿入
 　変形したmodelはlist/models.pyに記載
 	etenki.db  → db.sqlite3
 	bunrui     → bunrui

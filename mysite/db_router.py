@@ -18,9 +18,8 @@ class DBRouter:
     def allow_relation(self, obj1, obj2, **hints):
         return True
 
-    # basemodelのマイグレーションを実行しない。
-    def allow_migrate(self, db, app_label, model=None, **hints):
-        if app_label == 'basemodel':
+    # 運用DBだけに通常のmigrationを適用し、旧DBには一切適用しない。
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        if db != 'default':
             return False
-        else:
-            return 'default'
+        return app_label != 'basemodel'

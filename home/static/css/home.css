@@ -1,5 +1,6 @@
-/* ヘッダー画像の高さを制限する */
-.header-image {
+/* トップ画面と検索画面に共通のヘッダー画像を中央に配置し、高さを保つ。 */
+.header-image,
+.search-header__image {
     display: block;
     max-height: 500px;
     margin: 0 auto;
