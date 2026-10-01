@@ -80,8 +80,10 @@ def _build_bunrui_tree_prefixes():
     return prefixes
 
 
+# 表示時に分類番号へ付ける階層記号を、起動時に一度生成する。
 BUNRUI_TREE_PREFIXES = _build_bunrui_tree_prefixes()
 
+# 詳細検索フォームで共有する内容分類・カテゴリ・巻・表示設定の選択肢を定義する。
 # 未登録の分類番号は、既知の分類に続けてID順で表示する。
 BUNRUI_CHOICES = Bunrui.objects.annotate(
     bunrui_display_order=Case(

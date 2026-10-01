@@ -140,6 +140,7 @@ LEGACY_DATABASE_URI = f'{(BASE_DIR / "etenki.db").as_uri()}?mode=ro'
 # テスト時だけは、旧DBを模した書込み可能なインメモリDBを使用する。
 TEST_LEGACY_DATABASE_URI = 'file:memorydb_etenki?mode=memory&cache=shared'
 
+# defaultはDjangoが管理する検索用DB、etenkiは旧DBを読み取り専用で参照する。
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -192,6 +193,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+# collectstaticの公開先と、記事PDFリンクの基底URLを定義する。
 STATIC_URL = 'static/'
 
 STATIC_ROOT = BASE_DIR / 'static'

@@ -1,36 +1,53 @@
 # 「天気」記事検索 — 導入・初期設定
 
-この文書は、アプリケーションを新しい環境へ導入する担当者向けです。日常のデータ管理、Django admin の操作、バックアップの判断基準は [README.md](README.md) を参照してください。
+本番環境の構築・導入する方法を説明する。Django admin を使う日常のデータ管理は [README.md](README.md)、実装とDjangoの設計は [README_prog.md](README_prog.md) を参照してください。
 
-## 1. 構成とデータの扱い
+「プロジェクトルート」は、`manage.py`、`mysite/`、`list/` があるディレクトリを指します。
 
-初回導入時だけ、空の検索用DBへ初期データを投入してから旧DBを同期します。同期完了後の編集はDjango admin（`/admin/`）で行い、旧DB同期を再実行しません。
+## 1. 導入前の前提
+
+### 旧データの受渡し
+
+初回投入で参照する旧データは `etenki.db` です。
+
+|旧テーブル|必要な主な列|用途|
+|---|---|---|
+|`kiji`|`id`、`bunrui`、`category`、`title_jp`、`author_jp`、`volume`、`start_page`、`no`、`keyword`、`pdf`|記事と関連値の初期同期元|
+|`naiyou`|`id`、`title`|内容分類の初期同期元|
+
+etenki.dbは、本番環境に搭載する直前に再度作成していただく必要があります。なお、etenki.dbは、 エラーが出ますので、[README_prog.md](README_prog.md)の下部記載のように、あらかじめ修正をお願いします。
+`basemodel/initial_data/years.csv`と`months.csv` は第66巻（2019年）までです。初期同期を行う前に、最新まで追加する必要があります。
+
+## 2. 構成とデータの扱い
+
+新規導入では、空の検索用DBへスキーマと初期データを作成してから、旧DBを一度だけ同期します。同期完了後の編集はDjango admin（`/admin/`）で行い、旧DB同期を再実行しません。
 
 |対象|用途|運用上の扱い|
 |---|---|---|
-|`db.sqlite3`|検索記事、巻・号、カテゴリ・原稿種別、認証、adminの操作履歴を保持する運用DB|読み書き可|
-|`etenki.db`|旧データの参照元（`kiji`、`naiyou`）|変更禁止の参照用データ|
-|`basemodel/initial_data/` と `basemodel/management/commands/initialize_search_db.py`|初回導入専用のCSVとコマンド|初回導入以外では使用しない|
-|`static/`|`collectstatic` が出力する静的ファイル|Webサーバーが配信する|
+|`db.sqlite3`|検索記事、巻・号、カテゴリ・原稿種別、認証、adminの操作履歴を保持する運用DB|サービスアカウントが読み書きする。|
+|`etenki.db`|旧データの参照元（`kiji`、`naiyou`）|読取り専用。初回同期後の通常運用では更新しない。|
+|`basemodel/initial_data/`|原稿種別、カテゴリ、巻、号の承認済み初期データCSV|初回投入専用。|
+|`basemodel/management/commands/initialize_search_db.py`|空の検索用DBを構成し旧DBを同期するコマンド|初回導入時だけ使用する。|
+|各アプリ内の`static/`|CSS、JavaScript、画像の元ファイル|ソースとして管理する。|
+|`static/`|`collectstatic` の出力先|Webサーバーが配信する。直接編集しない。|
 
-> **重要:** 初回導入では、テスト用や旧環境の`db.sqlite3`を配置しません。空の`db.sqlite3`へ`migrate`を適用した後、`initialize_search_db`を実行します。`migrate`は検索用テーブル・制約などのスキーマだけを作成し、検索用の初期データは投入しません。`initialize_search_db`は、最初に`category_groups.csv`から原稿種別25件を作成し、次に`etenki.db`の記事ID・内容分類IDを保った初期レコード、カテゴリ、巻・号を投入して旧DBの内容を同期します。`etenki.db`は読み取り専用で、コマンドは変更しません。
+`initialize_search_db` は、まず `category_groups.csv` の原稿種別25件を作成し、`categories.csv` のカテゴリID 1〜206へ原稿種別を対応付けます。続いて、`etenki.db` の記事ID・内容分類IDを維持した初期レコード、カテゴリ、巻・号を投入し、旧DBの内容を同期します。カテゴリは原稿種別なしで保存できません。処理全体は1つのトランザクションなので、失敗時または `--dry-run` 時に途中データは残りません。
 
-`initialize_search_db`は、`category_groups.csv`の原稿種別キー・名称・表示順を使って原稿種別25件を作成します。続いて、`categories.csv`にあるカテゴリID 1〜206へ原稿種別キーに対応する所属を付けて投入します。カテゴリは原稿種別なしで保存できません。初期投入中にエラーが出た場合は本番DBを手作業で変更せず、空のステージングDBと`basemodel/initial_data/`内のCSV、`etenki.db`を確認してください。
+## 3. プログラムの取得とリリース配置
 
+1. プログラムは、[GitHubの `202609` ブランチ](https://github.com/tandfyamaguchi/search_tenki/tree/202609) の「Code」→「Download ZIP」で取得してください。
+2. ZIPを展開し、`manage.py` があるディレクトリを本番のリリースディレクトリ（例: `./search_tenki`）として配置します。プロジェクトルートをWebサーバーのDocumentRootとして公開せず、静的ファイル用の `static/` だけを公開パスへ対応付けます。これにより、SQLiteファイルやソースコードの直接公開を防ぎます。
+3. `etenki.db` と `basemodel/initial_data/` が揃っていることを確認します。
+4. GitHubから取得したフォルダー内の `db.sqlite3` は削除してしてくだい。後述の手順の通り、空の `db.sqlite3` を作成するようにしています。
 
-## 2. 環境構築
+## 4. Python環境の構築
 
 以下のテスト環境と同じ構成を作る手順です。
 
 - Minicondaの `search-tenki-dj52` 環境
 - Python 3.12
 - Django 5.2 LTS
-
-### Minicondaの導入
-
-[Anaconda公式のMiniconda配布ページ](https://www.anaconda.com/download) から取得してください。
-
-### `search-tenki-dj52` 環境の作成
+Minicondaは [公式配布ページ](https://www.anaconda.com/download) から取得してください。
 
 ```sh
 cd ./search_tenki
@@ -46,103 +63,107 @@ python -m pip install "Django>=5.2,<5.3"
 python --version
 python -m django --version
 ```
-以後の `python manage.py` コマンドは、すべて `conda activate search-tenki-dj52` を実行した状態で使用します。
+以後の `python manage.py` コマンドは、対象のPython環境を有効化した状態で実行します。
 
-## 3. プログラム類の導入
+## 5. 本番用環境変数
 
-GitHubの
-https://github.com/tandfyamaguchi/search_tenki/tree/202609
-の「Code」＞「Download Zip」で、プログラム類をダウンロードします。
-`db.sqlite3`は削除して、./search_tenkiに保存します。
-初回導入では、既存・同梱の`db.sqlite3`をコピーしません。後述の手順で空の`db.sqlite3`を作成します。
+本番でのサーバーの設定推奨
 
-## 4. 本番用環境変数
+|環境変数|本番での値|役割|
+|---|---|---|
+|`DJANGO_DEBUG`|`0`|詳細なデバッグ表示を無効にする。|
+|`DJANGO_SECRET_KEY`|Django内部の署名に使う秘密のランダム文字列|セッション等の署名に使う。|
+|`DJANGO_ALLOWED_HOSTS`|公開するドメイン名|Hostヘッダーを検証する。|
 
-本番ではアプリケーションプロセスの起動前に、次の3つを設定します。値はシークレット管理機能またはサーバーの安全な環境設定に保存し、ソースコード、README、シェル履歴へ記録しません。
-
-```sh
-export DJANGO_DEBUG=0
-export DJANGO_SECRET_KEY='<シークレット管理機能から渡す値>'
-export DJANGO_ALLOWED_HOSTS='search.example.invalid,admin.example.invalid'
+次は値の形式を示す例です。
+```text
+DJANGO_DEBUG=0
+DJANGO_SECRET_KEY='<シークレット管理機能から渡す値>'
+DJANGO_ALLOWED_HOSTS='<公開ホスト名>,<管理画面を別ホストにする場合のホスト名>'
 ```
+`DJANGO_DEBUG=0` のとき、`DJANGO_SECRET_KEY` または `DJANGO_ALLOWED_HOSTS` が未設定だと、設定読み込み時に失敗します。
 
-- `DJANGO_DEBUG` は `1` / `true` / `yes` / `on` または `0` / `false` / `no` / `off` を受け付けます。
-- `DJANGO_ALLOWED_HOSTS` はカンマ区切りです。本番では空にできません。
-- `DJANGO_DEBUG=0` のとき、`DJANGO_SECRET_KEY` または `DJANGO_ALLOWED_HOSTS` が未設定なら起動時に失敗します。
+## 6. 新規DBの作成と初期データ投入
 
-確認コマンド:
-```sh
-python manage.py check --deploy
-```
-
-## 5. 空DBの作成、初期データ投入、旧DB同期、静的ファイル、管理者アカウント
-本番へ適用する前に、テスト環境で次を実行します。
-
-新規導入は、必ず「空DBの作成 → `migrate`によるスキーマ作成 → `initialize_search_db --dry-run`による検証 → `initialize_search_db --apply`による初期データ投入と旧DB同期 → `collectstatic`」の順に行います。
+`etenki.db` と初期CSVがあること、かつ **稼働用の `db.sqlite3` が存在しないこと** を確認してください。既存の運用DBがある環境には、この手順を適用しません。
 
 ```sh
 cd ./search_tenki
 conda activate search-tenki-dj52
 
-# 既存の運用DBを上書きしないことを確認して、空DBを作成する
+# 既存DBを上書きしない。存在した場合はここで停止する。
 test ! -e db.sqlite3
-touch db.sqlite3
 
-# 予定されるスキーマ変更を確認する
+# 設定・スキーマ変更予定を確認する。
+python manage.py check
 python manage.py migrate --database=default --plan
 
-# 承認されたスキーマ変更だけを適用する（検索用の初期データはまだ作成しない）
+# 承認済みのスキーマだけを空のdefault DBへ作成する。
 python manage.py migrate --database=default
 
-# 初期投入と旧DB同期を検証する。検索用DBへの変更はロールバックされる
+# 初期投入と旧DB同期をロールバック付きで検証する。
 python manage.py initialize_search_db --dry-run
 
-# 検証結果を承認後、初期投入と旧DB同期を確定する
+# 検証結果を承認後、空のDBへ一度だけ確定する。
 python manage.py initialize_search_db --apply
 
-# Webサーバーが配信する静的ファイルを集約する
+# Webサーバー配信用の静的ファイルを集約する。
 python manage.py collectstatic --noinput
-```
 
-`migrate --database=etenki` は絶対に実行しないでください。DBルーターは旧DBに対するmigration操作を拒否し、旧DB接続もSQLiteの読み取り専用設定です。通常の運用DBは必ず `default`（`db.sqlite3`）です。
-
-`migrate`直後の空DBには、検索用テーブル・制約などのスキーマだけが作成され、原稿種別・カテゴリ・記事・内容分類・巻・号の初期データはありません。`initialize_search_db`は、すべての`default`マイグレーションが適用済みで、原稿種別を含む初期投入対象テーブルが空であることを確認してから実行します。既存データがある場合は停止するため、テスト用や運用中のDBを上書きしません。
-
-### 初回導入専用コマンド
-
-初回のみ使用するCSVは`basemodel/initial_data/`に、コマンドは`basemodel/management/commands/initialize_search_db.py`にまとめています。`category_groups.csv`は「原稿種別キー、名称、表示順」、`categories.csv`は「カテゴリID、名称、原稿種別キー」、`years.csv`は「巻ID、発行年、巻番号」、`months.csv`は「号ID、巻ID、開始頁、号番号」の順です。`initialize_search_db`は、まず`category_groups.csv`から原稿種別25件を作成します。その後、記事ID・内容分類IDを`etenki.db`と同じ値で作成し、CSVからカテゴリ・巻・号を投入してから、内部の同期サービスを実行します。CSVは承認済みの固定初期データであり、内容を変更したり再生成したりしません。初期投入と同期は1つのトランザクションなので、失敗時や`--dry-run`時に`db.sqlite3`へ途中データは残りません。
-
-旧DBにある著者・キーワードの表記は、初回同期時に整形せずそのまま引き継ぎます。旧DBのデータを修正する必要がある場合は、同期完了後にDjango adminで管理します。
-
-`initialize_search_db`は`--dry-run`または`--apply`のどちらかを必ず指定します。`--apply`は空DBに対して一度だけ実行します。初回同期後は、`initialize_search_db`を再実行してはいけません。以後の記事・巻・号・カテゴリ・内容分類・キーワードの更新はadminで行います。
-
-`etenki.db`にだけ存在するカテゴリや、CSV・原稿種別の不整合がある場合、`initialize_search_db`は書き込み前に停止します。CSVや本番DBを手作業で変更せず、原因を確認してから初回導入をやり直してください。
-
-初回の管理者アカウントは、空DB作成、マイグレーション、初回同期を完了した後に作成します。パスワードは対話入力し、コマンドライン引数に渡しません。
-
-```sh
+# 管理者を対話入力で作成する。
 python manage.py createsuperuser --username '<管理者ID>'
 ```
 
-`createsuperuser` で作成した利用者は、adminへのログインと全管理権限を持ちます。共用アカウントや同梱DB中の既存アカウントを流用せず、担当者ごとに個別アカウントを作成してください。権限を絞る運用は、初期管理者がadminの「ユーザー」「グループ」で設定します。
+`migrate --database=etenki` は実行しないでください。DBルーターは旧DBへのmigrationを拒否し、旧DB接続もSQLiteの読取り専用設定です。通常の運用DBは必ず `default`（`db.sqlite3`）です。
 
-## 6. ローカル環境でのテスト実行
-```sh
-python manage.py test
-python manage.py check
-python -Wa manage.py check
-python manage.py makemigrations --check --dry-run
-python manage.py migrate --plan
-python manage.py runserver 127.0.0.1:8000 --noreload
+`initialize_search_db` は `--dry-run` または `--apply` のどちらかを必ず指定します。`--apply` は空DBに対して一度だけ実行します。同期後の記事・巻・号・カテゴリ・内容分類・キーワードの更新はDjango adminで行います。初回同期後にこのコマンドを再実行すると、運用中のデータを混在させるおそれがあるため実行しません。
+
+初期投入前または同期中の検証で、`etenki.db` のカテゴリがCSVにない、原稿種別の対応がない、IDが不整合であるなどの問題を検出すると、コマンドはトランザクションをロールバックして変更を残さず停止します。本番DBを手作業で変更せず、空のDBでやり直してください。
+
+## 7. WebサーバーとWSGIの接続
+
+```text
+利用者
+  └─ HTTPS対応Webサーバー / リバースプロキシ
+       ├─ /static/  ───────────────→ <プロジェクトルート>/static/
+       └─ その他のDjango URL ──────→ WSGIアプリケーションサーバー
+                                         └─ mysite.wsgi:application
+                                              ├─ db.sqlite3 (通常運用DB)
+                                              └─ etenki.db (初回投入時の読取り専用参照元)
 ```
 
-http://127.0.0.1:8000/ で、以下を確認します。
+|担当範囲|必須事項|
+|---|---|
+|Webサーバー／リバースプロキシ|TLS、公開URLからDjangoへの転送、`/static/` のファイル配信、アクセスログを設定する。|
+|WSGIアプリケーションサーバー|作業ディレクトリをプロジェクトルートにし、対象のPython環境で `mysite.wsgi:application` を読み込む。|
+|プロセス管理|環境変数を安全に渡し、起動・停止・再起動、異常終了時の再起動、アプリケーションログを管理する。|
+|Djangoアプリケーション|URL処理、検索、admin、DBアクセスを担当する。`asgi.py` はありますが、現行の公開構成はWSGIを前提としています。|
 
-1. トップ画面、巻・号検索、詳細検索が表示されること。
-2. 静的ファイル（CSS、画像、Django adminの装飾）が読み込まれること。
-3. `/admin/` で作成した個別管理者アカウントがログインできること。
-4. adminで許可されたモデルだけが表示されること。操作対象と必要な権限の詳細は [README.md](README.md) を参照してください。
+`STATIC_ROOT` は `<プロジェクトルート>/static/` です。`collectstatic` 後に、Webサーバーがこの絶対パスを `/static/` として配信できるよう設定してください。PDFはアップロードしません。記事の `pdf` に保存した相対パスと設定済みの外部PDF基底URLを組み合わせてリンクします。
 
-## 7. Webサーバーへの接続
+テンプレートはBootstrap、jQuery、Popper.jsを外部CDNからも読み込みます。
 
-静的ファイルの出力先は `STATIC_ROOT`（このプロジェクトでは `static/`）です。`collectstatic` の後、Webサーバーがこの出力先の静的URLを配信できるよう設定してください。Djangoアプリケーションだけで本番用静的ファイルを配信する構成にはしません。
+## 8. セキュリティ確認と受入テスト
+
+公開前に、本番と同じ環境変数をサービス定義から読み込ませて、次を実行します。
+
+```sh
+python manage.py check
+python manage.py check --deploy
+python manage.py test
+python manage.py makemigrations --check --dry-run
+python manage.py migrate --plan
+```
+
+`check --deploy` では、本番用設定で HSTS、HTTPSリダイレクト、セッションCookieの`Secure`属性、CSRF Cookieの`Secure`属性に関する警告が出ます。HTTPS終端とプロキシヘッダー（リバースプロキシの場合は `SECURE_PROXY_SSL_HEADER` を含む）の設計を確定し、必要な `settings.py` の変更をレビュー・テストしてから対処してください。HSTSは誤設定時の影響が大きいため、検証なしで有効化しません。
+
+### 確認事項
+1. `/`、巻・号検索、詳細検索、検索結果、`/search/copyright/` が表示されること。
+2. CSS、画像、Django adminの静的ファイルが `/static/` から読めること。
+3. PDFリンク、分類・著者・キーワードからの絞込み、詳細検索の並び順・表示件数・リセットが動くこと。
+4. `/admin/` に個別の管理者アカウントでログインでき、不要なモデルが表示されないこと。
+5. 意図しないHost名ではアクセスを拒否し、エラー画面に詳細情報が出ないこと。
+
+## 9. 本番反映、更新、ロールバック
+
+新規導入と、既にDjango版を運用している環境の更新は区別します。既存環境では `initialize_search_db` を実行せず、稼働中の `db.sqlite3` を置き換えません。通常の更新、バックアップ、復元は [README.md](README.md) の手順に従ってください。

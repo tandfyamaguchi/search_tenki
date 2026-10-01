@@ -26,6 +26,7 @@ from list.models import (
 from search.models import Month, Year
 
 
+# 初回投入で使用するCSVを格納するディレクトリ。
 INITIAL_DATA_DIRECTORY = Path(__file__).resolve().parents[2] / 'initial_data'
 
 

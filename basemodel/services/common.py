@@ -1,4 +1,4 @@
-# 旧DB同期と初期投入で共有する設定値と表示用の補助関数。
+# 旧DB・検索DBの別名、一括処理・エラー表示の上限、共有補助関数を定義する。
 
 SOURCE_DATABASE = 'etenki'
 TARGET_DATABASE = 'default'

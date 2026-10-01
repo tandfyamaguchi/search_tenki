@@ -9,6 +9,7 @@ from django.db.models.functions import Cast, Collate, Lower, NullIf, Trim
 from .models import Kijis
 
 
+# 記事一覧で許可する見出し並び替えとSQLite照合順の設定。
 ARTICLE_TEXT_COLLATION = 'article_text_order'
 TEXT_SORT_FIELDS = {
     'category': 'category__name',
