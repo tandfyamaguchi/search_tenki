@@ -243,6 +243,7 @@ class Command(BaseCommand):
     def _load_month_rows(self):
         filename = 'months.csv'
         rows = []
+        # months.csvは「号ID、号番号、開始頁、巻ID」の列順。
         for line_number, row in self._read_csv_rows(filename, 4):
             rows.append(
                 (
@@ -250,13 +251,13 @@ class Command(BaseCommand):
                         row[0], '号ID', filename, line_number,
                     ),
                     self._parse_positive_integer(
-                        row[1], '巻ID', filename, line_number,
+                        row[3], '巻ID', filename, line_number,
                     ),
                     self._parse_nonnegative_integer(
                         row[2], '開始頁', filename, line_number,
                     ),
                     self._parse_positive_integer(
-                        row[3], '号番号', filename, line_number,
+                        row[1], '号番号', filename, line_number,
                     ),
                 )
             )

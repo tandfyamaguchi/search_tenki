@@ -10,7 +10,6 @@
 
 - `etenki.db` への書込み、`migrate --database=etenki` の実行。
 - 初回同期後の `python manage.py initialize_search_db --apply` の再実行。
-- 稼働中の `db.sqlite3` をGitHubから取得したファイルで上書きすること。
 - `static/` 内の配信用ファイルを直接編集すること。
 - `DJANGO_DEBUG=1` を公開状態で有効にすること。
 
@@ -19,6 +18,7 @@
 管理画面の入口は `/admin/` です。初回導入時に `createsuperuser` で作成した利用者は全権限を持ちます。
 
 記事の日常操作は、ホームにある案内どおり「発行管理」→「巻」→対象の「号」から始めます。号の行で「この号に記事を追加」または「この号の記事を編集」を選びます。
+
 パスワードを忘れた場合
 ```sh
 cd ./search_tenki

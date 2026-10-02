@@ -101,6 +101,11 @@ class InitializeSearchDbCommandTests(TestCase):
         self.assertEqual(CategoryGroup.objects.count(), 25)
         self.assertEqual(Year.objects.count(), 66)
         self.assertEqual(Month.objects.count(), 786)
+        # CSVの巻・号対応を、同じ値にならないIDで確認する。
+        second_issue = Month.objects.get(id=2)
+        self.assertEqual(second_issue.volume_id, 1)
+        self.assertEqual(second_issue.no, 2)
+        self.assertEqual(second_issue.start_page, 33)
 
         article = Kijis.objects.get(id=1001)
         self.assertEqual(article.title, '初回投入の記事')

@@ -85,7 +85,12 @@ DJANGO_ALLOWED_HOSTS='<公開ホスト名>,<管理画面を別ホストにする
 
 ## 6. 新規DBの作成と初期データ投入
 
-`etenki.db` と初期CSVがあること、かつ **稼働用の `db.sqlite3` が存在しないこと** を確認してください。既存の運用DBがある環境には、この手順を適用しません。
+`etenki.db` と`basemodel/initial_data/`があること、かつ **稼働用の `db.sqlite3` が存在しないこと** を確認してください。既存の運用DBがある環境には、この手順を適用しません。
+
+etenki.dbは、直前に再度作成していただく必要があります。なお、etenki.dbそのままでは、 エラーが出ますので、[README_prog.md](README_prog.md)の下部記載のように、あらかじめ修正をお願いします（GitHubにあるetenki.dbは修正済みのものです）。
+`basemodel/initial_data/`のCSVと`etenki.db` に齟齬があると、エラーがでて停止します。特に、`basemodel/initial_data/years.csv`と`months.csv` は第66巻（2019年）までしかないので、初期同期を行う前に、最新まで追加する必要があります。
+
+初期投入前または同期中の検証で、`etenki.db` のカテゴリがCSVにない、原稿種別の対応がない、IDが不整合であるなどの問題を検出すると、停止します。本番DBを手作業で変更せず、再度空のDBでやり直してください。
 
 ```sh
 cd ./search_tenki
@@ -117,8 +122,6 @@ python manage.py createsuperuser --username '<管理者ID>'
 `migrate --database=etenki` は実行しないでください。DBルーターは旧DBへのmigrationを拒否し、旧DB接続もSQLiteの読取り専用設定です。通常の運用DBは必ず `default`（`db.sqlite3`）です。
 
 `initialize_search_db` は `--dry-run` または `--apply` のどちらかを必ず指定します。`--apply` は空DBに対して一度だけ実行します。同期後の記事・巻・号・カテゴリ・内容分類・キーワードの更新はDjango adminで行います。初回同期後にこのコマンドを再実行すると、運用中のデータを混在させるおそれがあるため実行しません。
-
-初期投入前または同期中の検証で、`etenki.db` のカテゴリがCSVにない、原稿種別の対応がない、IDが不整合であるなどの問題を検出すると、コマンドはトランザクションをロールバックして変更を残さず停止します。本番DBを手作業で変更せず、空のDBでやり直してください。
 
 ## 7. WebサーバーとWSGIの接続
 
@@ -157,13 +160,14 @@ python manage.py migrate --plan
 
 `check --deploy` では、本番用設定で HSTS、HTTPSリダイレクト、セッションCookieの`Secure`属性、CSRF Cookieの`Secure`属性に関する警告が出ます。HTTPS終端とプロキシヘッダー（リバースプロキシの場合は `SECURE_PROXY_SSL_HEADER` を含む）の設計を確定し、必要な `settings.py` の変更をレビュー・テストしてから対処してください。HSTSは誤設定時の影響が大きいため、検証なしで有効化しません。
 
+ローカル環境での確認
+```sh
+python manage.py runserver 127.0.0.1:8000 --noreload
+```
+
 ### 確認事項
 1. `/`、巻・号検索、詳細検索、検索結果、`/search/copyright/` が表示されること。
 2. CSS、画像、Django adminの静的ファイルが `/static/` から読めること。
 3. PDFリンク、分類・著者・キーワードからの絞込み、詳細検索の並び順・表示件数・リセットが動くこと。
 4. `/admin/` に個別の管理者アカウントでログインでき、不要なモデルが表示されないこと。
 5. 意図しないHost名ではアクセスを拒否し、エラー画面に詳細情報が出ないこと。
-
-## 9. 本番反映、更新、ロールバック
-
-新規導入と、既にDjango版を運用している環境の更新は区別します。既存環境では `initialize_search_db` を実行せず、稼働中の `db.sqlite3` を置き換えません。通常の更新、バックアップ、復元は [README.md](README.md) の手順に従ってください。
