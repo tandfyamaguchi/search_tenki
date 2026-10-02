@@ -18,7 +18,7 @@ venv/
 .vscode
 __pycache__
 myvenv
-db.sqlite3
+#db.sqlite3
 etenki.db
 #/static
 .DS_Store

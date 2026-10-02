@@ -15,9 +15,6 @@
 |`kiji`|`id`、`bunrui`、`category`、`title_jp`、`author_jp`、`volume`、`start_page`、`no`、`keyword`、`pdf`|記事と関連値の初期同期元|
 |`naiyou`|`id`、`title`|内容分類の初期同期元|
 
-etenki.dbは、本番環境に搭載する直前に再度作成していただく必要があります。なお、etenki.dbは、 エラーが出ますので、[README_prog.md](README_prog.md)の下部記載のように、あらかじめ修正をお願いします。
-`basemodel/initial_data/years.csv`と`months.csv` は第66巻（2019年）までです。初期同期を行う前に、最新まで追加する必要があります。
-
 ## 2. 構成とデータの扱い
 
 新規導入では、空の検索用DBへスキーマと初期データを作成してから、旧DBを一度だけ同期します。同期完了後の編集はDjango admin（`/admin/`）で行い、旧DB同期を再実行しません。
